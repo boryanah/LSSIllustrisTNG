@@ -1,0 +1,5 @@
+*.npy
+*.sh
+figs/*
+txt/*
+*.txt
