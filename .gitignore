@@ -3,3 +3,11 @@
 figs/*
 txt/*
 *.txt
+*~
+*.png
+*/__pycache__
+*/*/__pycache__
+__pycache__
+plotparams.py
+*/plotparams.py
+*/*/plotparams.py

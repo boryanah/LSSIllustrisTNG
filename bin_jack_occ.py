@@ -5,16 +5,11 @@ import Corrfunc
 import h5py
 import plotparams
 plotparams.default()
-
-#import matplotlib as mpl
-#mpl.rcParams.update({'font.family':'serif'})
-#mpl.rcParams.update({'font.size': 18})
-#mpl.rcParams['lines.linewidth'] = 3
 import sys
 
-st_cut = 10000#50000#10000#5000#10000
+st_cut = 10000
 
-
+want_fp_pos = 1 # do you want to take the galaxy position from the FP galaxies
 if len(sys.argv) > 1:
     if sys.argv[1] == '--help':
         print('proxy = m200c m200m mfof vmax vpeak m500c s2r')
@@ -37,19 +32,18 @@ show_fid = False#True
 if fix_1bin == True:
     skip = 500
     from mpi4py import MPI
-    #assert MPI.COMM_WORLD.Get_size() > 1
     i_bin = MPI.COMM_WORLD.Get_rank()*skip
     offset = 0
     i_bin += offset
     
-percent_num = 5#5#5#35#1 5 10 20
+percent_num = 5
 
 
 percent_thresh = percent_num/100.
 # bro nikva ideq tova kakvo
-N1 = 0#1#0#1
-N2 = 100#15#15#1#5
-N_div = 1#25
+N1 = 0
+N2 = 100
+N_div = 1
 
 if fix_1bin == True:
     fname_shuff = 'figs/many/Corr_poiss_shuff_'+str(st_cut)+'_thr5_'+str(i_bin)+'_'+str(i_bin+skip)+'.txt'
@@ -341,19 +335,50 @@ n_arr = np.array(n_arr)
 
 # minimum halo mass in the HOD
 M_200c_dm_min = np.min(M_200c_dm[dmo_inds_halo])
-    
-# mass of parent halo for each gal
-parent_mass_gal = M_200c_fp[parent_gal_fp]
-# for each halo, how many gal point to it (excluding case of 0) and index of halo
-parent_gal_un_fp,counts = np.unique(parent_gal_fp,return_counts=True)
-#parent_mass_un_gal = parent_mass_gal[parent_gal_un_fp]
-# counts of gals for all halos
-count_halo_fp = np.zeros(len(M_200c_fp),dtype=int)
-count_halo_dm = np.zeros(len(M_200c_dm),dtype=int)
 
-count_halo_dm_shuff = np.zeros(len(M_200c_dm),dtype=int)
+if want_fp_pos:
+    # for each halo, how many gal point to it (excluding case of 0) and index of halo
+    # order the parents they are already sorted
+    new_sort = np.argsort(parent_gal_fp)
+    #new_sort = np.arange(len(new_sort))))
+
+    # order the positions by parents. index returns indices of first occurrence
+    pos_gal_fp_nsorted = pos_gal_fp[new_sort]
+    parent_gal_un_fp, index,counts = np.unique(parent_gal_fp[new_sort],return_index=True,return_counts=True)
+    # npstart is like the cumulative npout starting from 0
+    nstart = np.cumsum(counts)
+    nstart[1:] = nstart[:-1]
+    nstart[0] = 0
+    #pos_gal_first_fp = pos_gal_fp_nsorted[index] # the position of the central galaxy
+    # and then use this npstart and npout arrays to extract from the sorted positions by parent array
+
+    # counts of gals for all halos
+    count_halo_fp = np.zeros(len(M_200c_fp),dtype=int)
+    nstart_halo_fp = np.zeros(len(M_200c_fp),dtype=int)-1
+    count_halo_dm = np.zeros(len(M_200c_dm),dtype=int)
+    nstart_halo_dm = np.zeros(len(M_200c_dm),dtype=int)-1
+    count_halo_dm_shuff = np.zeros(len(M_200c_dm),dtype=int)
+    nstart_halo_dm_shuff = np.zeros(len(M_200c_dm),dtype=int)-1
+
+    count_halo_fp[parent_gal_un_fp] = counts
+    nstart_halo_fp[parent_gal_un_fp] = nstart
+    # use me when excluding the 2063 objext and the matched halos are 1:1
+    count_halo_dm[dmo_inds_halo] += count_halo_fp[fp_inds_halo]
+
+else:
+    # mass of parent halo for each gal
+    parent_mass_gal = M_200c_fp[parent_gal_fp]
+    # for each halo, how many gal point to it (excluding case of 0) and index of halo
+    parent_gal_un_fp,counts = np.unique(parent_gal_fp,return_counts=True)
+    #parent_mass_un_gal = parent_mass_gal[parent_gal_un_fp]
+    # counts of gals for all halos
+    count_halo_fp = np.zeros(len(M_200c_fp),dtype=int)
+    count_halo_dm = np.zeros(len(M_200c_dm),dtype=int)
+    count_halo_dm_shuff = np.zeros(len(M_200c_dm),dtype=int)
             
-count_halo_fp[parent_gal_un_fp] += counts
+    count_halo_fp[parent_gal_un_fp] += counts
+    # use me when excluding the 2063 objext and the matched halos are 1:1
+    count_halo_dm[dmo_inds_halo] += count_halo_fp[fp_inds_halo]
 
 # count the galaxies in the corresponding DM halos
 '''
@@ -367,8 +392,6 @@ rs = u[c>1]
 for r in rs:
     count_halo_dm[r] += np.sum(count_halo_fp[fp_inds_halo[dmo_inds_halo == r]])
 '''
-# use me when excluding the 2063 objext and the matched halos are 1:1
-count_halo_dm[dmo_inds_halo] += count_halo_fp[fp_inds_halo]
 
 print("sum halo dm = ",np.sum(count_halo_dm))
 print("sum halo fp = ",np.sum(count_halo_fp))
@@ -779,120 +802,184 @@ for r in rs:
 # use me when excluding the 2063 objext
 count_halo_dm_shuff[dmo_inds_halo_shuff] += count_halo_fp[fp_inds_halo]
 
+if want_fp_pos:
+    # start of the subhalos
+    nstart_halo_dm[dmo_inds_halo] = nstart_halo_fp[fp_inds_halo]
+    nstart_halo_dm_shuff[dmo_inds_halo_shuff] = nstart_halo_fp[fp_inds_halo]
+
 # !!!
 if fix_1bin == True:
     count_halo_dm_shuff[np.logical_not(active)] = 0.
 
-weights_sub = np.zeros(N_sub_dm)
+if want_fp_pos:
 
-#SubhaloNsubs_dm = GroupNsubs_dm[parent_dm]
-# assign instead first gals to one with highest peak and not first
-inds_dm = np.arange(N_halo_dm)
-inds_sub_dm = np.arange(N_sub_dm)
-ind_gal_b1 = inds_dm[count_halo_dm >= 1]
-ind_fsub_gal = GroupFirstSub_dm[ind_gal_b1]
-Nsubs_gal = GroupNsubs_dm[ind_gal_b1]
-print(len(ind_gal_b1))
-# faster
-for l in range(len(ind_fsub_gal)):
-    N_g = count_halo_dm[ind_gal_b1[l]]
-    i_sub = inds_sub_dm[ind_fsub_gal[l]:(ind_fsub_gal[l]+Nsubs_gal[l])]
-    #sor_sub = np.argsort(SubhaloVmax_dm[parent_dm == dmh])[::-1]
-    sor_sub = np.argsort(SubhaloVpeak_dm[i_sub])[::-1]
-    #sor_sub = np.argsort(m_sub_dm[parent_dm == dmh])[::-1]
-    #sor_sub = np.argsort(SubhaloGrNr_dm[parent_dm == dmh])[::-1]
+    N_hal = np.sum(count_halo_dm > 0.5)
+    N_gal = np.sum(count_halo_dm)
 
-    chosens = i_sub[sor_sub]
-    weights_sub[chosens[:N_g]] = 1.
+    print("N_gal = ",N_gal)
+    xyz_shuff = np.zeros((N_gal,3))
+    xyz_DM = np.zeros((N_gal,3))
 
-print("weight sum = ",np.sum(weights_sub))
+    cou = count_halo_dm[count_halo_dm > 0.5]
+    nst = nstart_halo_dm[count_halo_dm > 0.5]
+    grfir = GroupFirstSub_dm[count_halo_dm > 0.5]
+    cum = 0
+    cou_shuff = count_halo_dm_shuff[count_halo_dm_shuff > 0.5]
+    nst_shuff = nstart_halo_dm_shuff[count_halo_dm_shuff > 0.5]
+    print(np.sum(nst_shuff==-1))
+    print(np.sum(nst==-1))
+    print(np.sum(cou_shuff))
 
-# BEG SHUFF
-weights_sub_shuff = np.zeros(N_sub_dm)
-
-inds_dm = np.arange(N_halo_dm)
-inds_sub_dm = np.arange(N_sub_dm)
-ind_gal_b1 = inds_dm[count_halo_dm_shuff >= 1]
-ind_fsub_gal = GroupFirstSub_dm[ind_gal_b1]
-Nsubs_gal = GroupNsubs_dm[ind_gal_b1]
-print(len(ind_gal_b1))
-
-# faster
-
-for l in range(len(ind_fsub_gal)):
-    N_g = count_halo_dm_shuff[ind_gal_b1[l]]
-    i_sub = inds_sub_dm[ind_fsub_gal[l]:(ind_fsub_gal[l]+Nsubs_gal[l])]
-    if len(i_sub) <= N_g:
-        weights_sub_shuff[i_sub] = N_g*1./len(i_sub)
-        continue
-    #sor_sub = np.argsort(SubhaloVmax_dm[parent_dm == dmh])[::-1]
-    sor_sub = np.argsort(SubhaloVpeak_dm[i_sub])[::-1]
-    #sor_sub = np.argsort(m_sub_dm[parent_dm == dmh])[::-1]
-    #sor_sub = np.argsort(SubhaloGrNr_dm[parent_dm == dmh])[::-1]
-    chosens = i_sub[sor_sub]
-    weights_sub_shuff[chosens[:N_g]] = 1.
-
-print("weight sum shuff = ",np.sum(weights_sub_shuff))
-print("number of gals in "+str(N_exc_mm)+" most massive halos = ",np.sum(count_halo_dm_sorted[:N_exc_mm]))
-
-# This is where the indentation used to end
-# CORRFUNC
-x_DM = subhalo_pos_dm[:,0]
-y_DM = subhalo_pos_dm[:,1]
-#print("unique y's = ", len(np.unique(y_DM)))
-z_DM = subhalo_pos_dm[:,2]
-#print("len z = ",len(z_DM))
+    grfir_shuff = GroupFirstSub_dm[count_halo_dm_shuff > 0.5]
+    cum_shuff = 0
+    for k in range(N_hal):
+        
+        pos = pos_gal_fp_nsorted[nst[k]:nst[k]+cou[k]]
+        pos -= pos_gal_fp_nsorted[nst[k]]#pos_gal_first_fp[k]
+        
+        xyz_DM[cum:cum+cou[k]] = pos+SubhaloPos_dm[grfir[k]]
+        cum += cou[k]
 
 
+        #if k == 23: quit()
+        pos_shuff = pos_gal_fp_nsorted[nst_shuff[k]:nst_shuff[k]+cou_shuff[k]]
+        pos_shuff -= pos_gal_fp_nsorted[nst_shuff[k]]#pos_gal_first_fp[k]
+        xyz_shuff[cum_shuff:cum_shuff+cou_shuff[k]] = pos_shuff+SubhaloPos_dm[grfir_shuff[k]]
+        cum_shuff += cou_shuff[k]
+    # subtract the central galaxy tuki
 
-# cut for only positive weights
+    # BSING TESTING TUKSI
+    x_DM = xyz_DM[:,0];y_DM = xyz_DM[:,1];z_DM = xyz_DM[:,2]
+    w_DM = np.full_like(x_DM,1.)
+    x = xyz_shuff[:,0];y = xyz_shuff[:,1];z = xyz_shuff[:,2]
+    w = np.full_like(x,1.)
+
+    x_DM[x_DM<0.] = Lboxs[i]-x_DM[x_DM<0.]
+    z_DM[z_DM<0.] = Lboxs[i]-z_DM[z_DM<0.]
+    y_DM[y_DM<0.] = Lboxs[i]-y_DM[y_DM<0.]
+    x_DM[x_DM>Lboxs[i]] = -Lboxs[i]+x_DM[x_DM>Lboxs[i]]
+    z_DM[z_DM>Lboxs[i]] = -Lboxs[i]+z_DM[z_DM>Lboxs[i]]
+    y_DM[y_DM>Lboxs[i]] = -Lboxs[i]+y_DM[y_DM>Lboxs[i]]
+
+    x[x<0.] = Lboxs[i]-x[x<0.]
+    z[z<0.] = Lboxs[i]-z[z<0.]
+    y[y<0.] = Lboxs[i]-y[y<0.]
+    x[x>Lboxs[i]] = -Lboxs[i]+x[x>Lboxs[i]]
+    z[z>Lboxs[i]] = -Lboxs[i]+z[z>Lboxs[i]]
+    y[y>Lboxs[i]] = -Lboxs[i]+y[y>Lboxs[i]]
+
+    xyz_DM = np.vstack((x_DM,y_DM,z_DM)).T
+    xyz_shuff = np.vstack((x,y,z)).T
     
-x_DM = x_DM[weights_sub > 1.e-12]
-y_DM = y_DM[weights_sub > 1.e-12]
-z_DM = z_DM[weights_sub > 1.e-12]
-    
-x_DM[x_DM<0.] = Lboxs[i]-x_DM[x_DM<0.]
-z_DM[z_DM<0.] = Lboxs[i]-z_DM[z_DM<0.]
-y_DM[y_DM<0.] = Lboxs[i]-y_DM[y_DM<0.]
-x_DM[x_DM>Lboxs[i]] = -Lboxs[i]+x_DM[x_DM>Lboxs[i]]
-z_DM[z_DM>Lboxs[i]] = -Lboxs[i]+z_DM[z_DM>Lboxs[i]]
-y_DM[y_DM>Lboxs[i]] = -Lboxs[i]+y_DM[y_DM>Lboxs[i]]
+else:
+    weights_sub = np.zeros(N_sub_dm)
 
-    
-weights_sub = weights_sub[weights_sub > 1.e-12]
+    #SubhaloNsubs_dm = GroupNsubs_dm[parent_dm]
+    # assign instead first gals to one with highest peak and not first
+    inds_dm = np.arange(N_halo_dm)
+    inds_sub_dm = np.arange(N_sub_dm)
+    ind_gal_b1 = inds_dm[count_halo_dm >= 1]
+    ind_fsub_gal = GroupFirstSub_dm[ind_gal_b1]
+    Nsubs_gal = GroupNsubs_dm[ind_gal_b1]
+    print(len(ind_gal_b1))
+    # faster
+    for l in range(len(ind_fsub_gal)):
+        N_g = count_halo_dm[ind_gal_b1[l]]
+        i_sub = inds_sub_dm[ind_fsub_gal[l]:(ind_fsub_gal[l]+Nsubs_gal[l])]
+        #sor_sub = np.argsort(SubhaloVmax_dm[parent_dm == dmh])[::-1]
+        sor_sub = np.argsort(SubhaloVpeak_dm[i_sub])[::-1]
+        #sor_sub = np.argsort(m_sub_dm[parent_dm == dmh])[::-1]
+        #sor_sub = np.argsort(SubhaloGrNr_dm[parent_dm == dmh])[::-1]
 
-#print("unique z's = ",len(np.unique(z_DM)))
-#print("unique y's = ",len(np.unique(y_DM)))
-#print("unique x's = ",len(np.unique(x_DM)))
-w_DM = np.full_like(x_DM,1.)
-w_DM[:] = weights_sub[:]
-#print("max weight = ",np.max(w_DM))
+        chosens = i_sub[sor_sub]
+        weights_sub[chosens[:N_g]] = 1.
 
-x = subhalo_pos_dm[:,0]
-y = subhalo_pos_dm[:,1]
-#print("unique y's = ", len(np.unique(y)))
-z = subhalo_pos_dm[:,2]
-#print("len z = ",len(z))
+    print("weight sum = ",np.sum(weights_sub))
 
-x = x[weights_sub_shuff > 1.e-12]
-y = y[weights_sub_shuff > 1.e-12]
-z = z[weights_sub_shuff > 1.e-12]
-    
-x[x<0.] = Lboxs[i]-x[x<0.]
-z[z<0.] = Lboxs[i]-z[z<0.]
-y[y<0.] = Lboxs[i]-y[y<0.]
-x[x>Lboxs[i]] = -Lboxs[i]+x[x>Lboxs[i]]
-z[z>Lboxs[i]] = -Lboxs[i]+z[z>Lboxs[i]]
-y[y>Lboxs[i]] = -Lboxs[i]+y[y>Lboxs[i]]
-weights_sub_shuff = weights_sub_shuff[weights_sub_shuff > 1.e-12]
+    # BEG SHUFF
+    weights_sub_shuff = np.zeros(N_sub_dm)
 
-#print("unique z's = ",len(np.unique(z)))
-#print("unique y's = ",len(np.unique(y)))
-#print("unique x's = ",len(np.unique(x)))
-            
-w = np.full_like(x,1.)
-w[:] = weights_sub_shuff[:]
-print("max weight = ",np.max(w))
+    inds_dm = np.arange(N_halo_dm)
+    inds_sub_dm = np.arange(N_sub_dm)
+    ind_gal_b1 = inds_dm[count_halo_dm_shuff >= 1]
+    ind_fsub_gal = GroupFirstSub_dm[ind_gal_b1]
+    Nsubs_gal = GroupNsubs_dm[ind_gal_b1]
+    print(len(ind_gal_b1))
+
+    # faster
+
+    for l in range(len(ind_fsub_gal)):
+        N_g = count_halo_dm_shuff[ind_gal_b1[l]]
+        i_sub = inds_sub_dm[ind_fsub_gal[l]:(ind_fsub_gal[l]+Nsubs_gal[l])]
+        if len(i_sub) <= N_g:
+            weights_sub_shuff[i_sub] = N_g*1./len(i_sub)
+            continue
+        #sor_sub = np.argsort(SubhaloVmax_dm[parent_dm == dmh])[::-1]
+        sor_sub = np.argsort(SubhaloVpeak_dm[i_sub])[::-1]
+        #sor_sub = np.argsort(m_sub_dm[parent_dm == dmh])[::-1]
+        #sor_sub = np.argsort(SubhaloGrNr_dm[parent_dm == dmh])[::-1]
+        chosens = i_sub[sor_sub]
+        weights_sub_shuff[chosens[:N_g]] = 1.
+
+    print("weight sum shuff = ",np.sum(weights_sub_shuff))
+    print("number of gals in "+str(N_exc_mm)+" most massive halos = ",np.sum(count_halo_dm_sorted[:N_exc_mm]))
+
+    # This is where the indentation used to end
+    # CORRFUNC
+    x_DM = subhalo_pos_dm[:,0]
+    y_DM = subhalo_pos_dm[:,1]
+    #print("unique y's = ", len(np.unique(y_DM)))
+    z_DM = subhalo_pos_dm[:,2]
+    #print("len z = ",len(z_DM))
+
+    # cut for only positive weights
+
+    x_DM = x_DM[weights_sub > 1.e-12]
+    y_DM = y_DM[weights_sub > 1.e-12]
+    z_DM = z_DM[weights_sub > 1.e-12]
+
+    x_DM[x_DM<0.] = Lboxs[i]-x_DM[x_DM<0.]
+    z_DM[z_DM<0.] = Lboxs[i]-z_DM[z_DM<0.]
+    y_DM[y_DM<0.] = Lboxs[i]-y_DM[y_DM<0.]
+    x_DM[x_DM>Lboxs[i]] = -Lboxs[i]+x_DM[x_DM>Lboxs[i]]
+    z_DM[z_DM>Lboxs[i]] = -Lboxs[i]+z_DM[z_DM>Lboxs[i]]
+    y_DM[y_DM>Lboxs[i]] = -Lboxs[i]+y_DM[y_DM>Lboxs[i]]
+
+
+    weights_sub = weights_sub[weights_sub > 1.e-12]
+
+    #print("unique z's = ",len(np.unique(z_DM)))
+    #print("unique y's = ",len(np.unique(y_DM)))
+    #print("unique x's = ",len(np.unique(x_DM)))
+    w_DM = np.full_like(x_DM,1.)
+    w_DM[:] = weights_sub[:]
+    #print("max weight = ",np.max(w_DM))
+
+    x = subhalo_pos_dm[:,0]
+    y = subhalo_pos_dm[:,1]
+    #print("unique y's = ", len(np.unique(y)))
+    z = subhalo_pos_dm[:,2]
+    #print("len z = ",len(z))
+
+    x = x[weights_sub_shuff > 1.e-12]
+    y = y[weights_sub_shuff > 1.e-12]
+    z = z[weights_sub_shuff > 1.e-12]
+
+    x[x<0.] = Lboxs[i]-x[x<0.]
+    z[z<0.] = Lboxs[i]-z[z<0.]
+    y[y<0.] = Lboxs[i]-y[y<0.]
+    x[x>Lboxs[i]] = -Lboxs[i]+x[x>Lboxs[i]]
+    z[z>Lboxs[i]] = -Lboxs[i]+z[z>Lboxs[i]]
+    y[y>Lboxs[i]] = -Lboxs[i]+y[y>Lboxs[i]]
+    weights_sub_shuff = weights_sub_shuff[weights_sub_shuff > 1.e-12]
+
+    #print("unique z's = ",len(np.unique(z)))
+    #print("unique y's = ",len(np.unique(y)))
+    #print("unique x's = ",len(np.unique(x)))
+
+    w = np.full_like(x,1.)
+    w[:] = weights_sub_shuff[:]
+    print("max weight = ",np.max(w))
 
 x_FP = pos_gal_fp[:,0]
 y_FP = pos_gal_fp[:,1]
@@ -902,12 +989,16 @@ xyz_FP = np.vstack((x_FP,y_FP,z_FP)).T
 xyz_shuff = np.vstack((x,y,z)).T
 xyz_DM = np.vstack((x_DM,y_DM,z_DM)).T
 
-np.save("Lensing/"+proxy+"_"+opt+"_gals.npy",xyz_shuff)
-np.save("Lensing/true_gals.npy",xyz_DM)
+if want_fp_pos:
+    ext = 'pos'
+else:
+    ext = 'peak'
+np.save("Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals.npy",xyz_shuff)
+np.save("Lensing/data_2dhod_"+ext+"/true_gals.npy",xyz_DM)
 #quit()
 
 # REMOVE for new proxies
-bin_centers, a,b,c,d,xi_fid_shuff,xi_fid_shuff_err,rat_fid_shuff,rat_fid_shuff_err = np.loadtxt('/home/boryanah/lars/test/figs/paper/Corr_shuff_'+proxy+'.txt',unpack=True)
+bin_centers, a,b,c,d,xi_fid_shuff,xi_fid_shuff_err,rat_fid_shuff,rat_fid_shuff_err = np.loadtxt('/home/boryanah/lars/LSSIllustrisTNG/figs/paper/Corr_shuff_'+proxy+'.txt',unpack=True)
 
 N_dim = 3
 N_bin = 31
@@ -1006,9 +1097,9 @@ for i_x in range(N_dim):
                 if fix_1bin == True:
                     plt.legend(loc='lower right')
                     plt.text(0.1, 1.45, "mass range: %10.5E - %10.5E, bin size: %4i" %(mass_beg,mass_end,N_diff), dict(size=12))
-                    plt.close()#plt.savefig('/home/boryanah/lars/test/figs/many/'+figname[:-4]+'_'+str(i_bin)+'_all.png')
+                    plt.close()#plt.savefig('/home/boryanah/lars/LSSIllustrisTNG/figs/many/'+figname[:-4]+'_'+str(i_bin)+'_all.png')
                 else:
-                    plt.savefig('/home/boryanah/lars/test/figs/'+figname[:-4]+'_all.png')
+                    plt.savefig('/home/boryanah/lars/LSSIllustrisTNG/figs/'+figname[:-4]+'_all.png')
                 plt.show()
 
 if show_fid == True:
@@ -1031,11 +1122,11 @@ Corr_err_FP = np.sqrt(N_dim**3-1)*np.std(Corr_f_FP,axis=1)
 
 '''
 # REMOVE for new proxies
-np.savetxt('/home/boryanah/lars/test/figs/paper/Corr_shuff_'+proxy+'.txt',(np.vstack((bin_centers, Corr_mean_FP*bin_centers**2,Corr_err_FP*bin_centers**2,Corr_mean_DM*bin_centers**2,Corr_err_DM*bin_centers**2,Corr_mean_DM_shuff*bin_centers**2,Corr_err_DM_shuff*bin_centers**2,Rat_HOD_mean,Rat_HOD_err)).T))
+np.savetxt('/home/boryanah/lars/LSSIllustrisTNG/figs/paper/Corr_shuff_'+proxy+'.txt',(np.vstack((bin_centers, Corr_mean_FP*bin_centers**2,Corr_err_FP*bin_centers**2,Corr_mean_DM*bin_centers**2,Corr_err_DM*bin_centers**2,Corr_mean_DM_shuff*bin_centers**2,Corr_err_DM_shuff*bin_centers**2,Rat_HOD_mean,Rat_HOD_err)).T))
 quit()
 '''
 
-np.savetxt('/home/boryanah/lars/test/'+figname[:-4]+'.txt',(np.vstack((bin_centers, Corr_mean_FP*bin_centers**2,Corr_err_FP*bin_centers**2,Corr_mean_DM*bin_centers**2,Corr_err_DM*bin_centers**2,Corr_mean_DM_shuff*bin_centers**2,Corr_err_DM_shuff*bin_centers**2,Rat_HOD_mean,Rat_HOD_err)).T))
+np.savetxt('/home/boryanah/lars/LSSIllustrisTNG/'+figname[:-4]+'.txt',(np.vstack((bin_centers, Corr_mean_FP*bin_centers**2,Corr_err_FP*bin_centers**2,Corr_mean_DM*bin_centers**2,Corr_err_DM*bin_centers**2,Corr_mean_DM_shuff*bin_centers**2,Corr_err_DM_shuff*bin_centers**2,Rat_HOD_mean,Rat_HOD_err)).T))
 fs = (12,8)#(8.2/1.4,6.5/1.4)#(8.2,6.5)
 fig = plt.figure(figsize=fs)
 plt.errorbar(bin_centers, Corr_mean_FP*bin_centers**2,yerr=Corr_err_FP*bin_centers**2,lw=2.,ls='-',c='silver',fmt='o',capsize=2,label=str(res[i])+ ' FP')
@@ -1063,10 +1154,10 @@ elif binning == 'std':
 if fix_1bin == True:
     plt.legend(loc='lower right')
     #tukplt.text(0.1, 74, "mass range: %10.5E - %10.5E" %(mass_beg,mass_end), dict(size=15))
-    #tukplt.savefig('/home/boryanah/lars/test/'+figname[:-4]+'.pdf')
-    #plt.savefig('/home/boryanah/lars/test/'+figname[:-4]+'.png')
+    #tukplt.savefig('/home/boryanah/lars/LSSIllustrisTNG/'+figname[:-4]+'.pdf')
+    #plt.savefig('/home/boryanah/lars/LSSIllustrisTNG/'+figname[:-4]+'.png')
 else:
-    plt.savefig('/home/boryanah/lars/test/figs/'+figname)
+    plt.savefig('/home/boryanah/lars/LSSIllustrisTNG/figs/'+figname)
 #plt.show()
 plt.close()
 
@@ -1117,12 +1208,12 @@ if fix_1bin == True:
     else:
         print('bla')
         #tukplt.text(0.1, 1.45, ("mass range: %8.3E - %8.3E" %(mass_beg,mass_end)), dict(size=15))
-    #tukplt.savefig('/home/boryanah/lars/test/'+figname[:-4]+'_rat.pdf')
-    plt.savefig('/home/boryanah/lars/test/'+figname[:-4]+'_rat.png')
+    #tukplt.savefig('/home/boryanah/lars/LSSIllustrisTNG/'+figname[:-4]+'_rat.pdf')
+    plt.savefig('/home/boryanah/lars/LSSIllustrisTNG/'+figname[:-4]+'_rat.png')
     #plt.show()
     plt.close()
 else:
-    plt.savefig('/home/boryanah/lars/test/figs/'+figname[:-4]+'_rat.png')
+    plt.savefig('/home/boryanah/lars/LSSIllustrisTNG/figs/'+figname[:-4]+'_rat.png')
     #plt.show()
     plt.close()
 
