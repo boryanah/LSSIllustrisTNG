@@ -11,12 +11,8 @@ import plotparams
 plotparams.buba()
 
 proxy = 'm200m'
-#opts = np.array(['shuff', 'env_mass', 'min_pot', 'partial_vani', 'partial_env_cw', 'partial_tot_pot', 'conc', 'spin'])
-#opts = np.array(['shuff', 'env_mass', 'min_pot', 'partial_vani', 'partial_env_cw', 'partial_tot_pot', 'partial_s2r', 'partial_fenv'])
 opts = np.array(['partial_env_cw','partial_vani','partial_s2r','partial_tot_pot'])
-
-#options = np.array(['hydrosim.', 'local env.', r'$\sigma^2 R_{\rm halfmass}$', 'vel. anis.','vel. disp.', 'concentration','min. pot.', 'total pot.'])
-options = opts
+lab_opts = np.array(['environment','vel. anisotropy',r'$\sigma^2 R_{\rm halfmass}$', 'tot. potential'])
 
 N = len(opts)
 
@@ -26,11 +22,10 @@ rat_shuff_err = np.load("../data_jack/ds_rat_"+proxy+"_shuff_err.npy")
 
 nrows = 1
 ncols = N//nrows
-plt.subplots(nrows,ncols,figsize=(ncols*4.5,nrows*4.8))
+plt.subplots(nrows,ncols,figsize=(ncols*4.7,nrows*5.7))
 for i in range(N):
     opt = opts[i]
-    option = options[i]
-    lab_name = '-'.join(option.split('_'))
+    lab_name = lab_opts[i]#'-'.join(opt.split('_'))
     plt.subplot(nrows,ncols,i+1)
     rat_mean = np.load("../data_jack/ds_rat_"+proxy+"_"+opt+"_mean.npy")
     rat_err = np.load("../data_jack/ds_rat_"+proxy+"_"+opt+"_err.npy")
@@ -38,19 +33,19 @@ for i in range(N):
     plt.plot(rp_mids,np.ones(len(rp_mids)),'k--',alpha=0.2)
 
     if i == 0:
-        fid_name = 'shuff'
+        fid_name = 'basic HOD'
     else:
         fid_name = ''
         
     plt.plot(rp_mids,rat_shuff_mean,linewidth=1.,color='#1B2ACC',label=fid_name)
     plt.fill_between(rp_mids,rat_shuff_mean+rat_shuff_err,rat_shuff_mean-rat_shuff_err,alpha=0.1, edgecolor='#1B2ACC', facecolor='#089FFF')
 
-    plt.errorbar(rp_mids,rat_mean,yerr=rat_err,ls='-',c='orange',fmt='o',capsize=4,label=lab_name)
+    plt.errorbar(rp_mids,rat_mean,yerr=rat_err,ls='-',c='#CC6677',fmt='o',capsize=4,label=lab_name)
 
     plt.legend(loc='upper left',ncol=1)
     plt.xscale('log')
     if i == 0 or i==N//nrows:
-        plt.ylabel(r'$\xi(r)_{\rm sec. prop.} / \xi(r)_{\rm TNG300}$') # Daniel
+        plt.ylabel(r'$\xi(r)_{\rm model} / \xi(r)_{\rm TNG300}$') # Daniel
     else:
         plt.gca().axes.yaxis.set_ticklabels([])
     # for getting rid of the numbers on x axis
@@ -66,8 +61,8 @@ for i in range(N):
     plt.gca().axes.xaxis.set_major_locator(ticker.LogLocator(base=10))
     plt.gca().axes.xaxis.set_major_locator(ticker.FixedLocator([0.1,1,10]))
     plt.ylim([0.9,1.15])
-    plt.xlim([0.6,25])
+    plt.xlim([0.27,25])
 
-plt.savefig('jack_m200m_delta_sigma.png')
+plt.savefig('jack_m200m_delta_sigma.pdf')
 plt.show()
 plt.close()

@@ -5,15 +5,23 @@ import plotparams
 plotparams.default()
 import sys
 import h5py
-from utils import *
+from utils import compute_binned_stats, plot_median
 plt.rc('text', usetex=True)
 
-want_abundance = int(sys.argv[1])
-want_environment = int(sys.argv[2])
-want_satellites = 0
-comp_sham_true = 1 # abund vs true dm from fp
-if want_environment:
-    lohi = sys.argv[3]#_lo _hi
+# if yes then not doing the matching between fp and dm, otherwise abundance matching
+want_abundance = 0#int(sys.argv[1])
+# if yes select high or low below
+
+# choose mode
+#want_environment = 0; want_formation = 1
+want_environment = 1; want_formation = 0
+#want_environment = 0; want_formation = 0
+
+want_satellites = 0 # only isolate subhalos which are satellites
+comp_sham_true = 1 # abund vs true dm from fp i.e. compare abundance matched dm subhalos with the corresponding ones to fp in dm
+want_x_fixed = 1 # what is on the x axis
+if want_environment or want_formation:
+    lohi = sys.argv[1]#_lo _hi
 else:
     lohi = ''
 if want_satellites:
@@ -50,24 +58,66 @@ sub_inds_dm = np.arange(len(SubhaloMassType_dm)).astype(int)
 # load other mass proxies
 SubhaloVmax_fp = np.load(root+'SubhaloVmax_fp.npy')
 SubhaloVelDisp_fp = np.load(root+'SubhaloVelDisp_fp.npy')
-SubhaloVpeak_fp = np.load(root+'SubhaloVpeak_fp.npy')
-SubhaloMpeak_fp = np.load(root+'SubhaloMpeak_fp.npy')*1.e10
-SubhaloVpeak_fp[SubhaloVpeak_fp==0.] = SubhaloVmax_fp[SubhaloVpeak_fp==0.]#*20.
-SubhaloVinfall_fp = np.load(root+'SubhaloVinfall_fp.npy')
-SubhaloMinfall_fp = np.load(root+'SubhaloMinfall_fp.npy')*1.e10
-SubhaloVrelax_fp = np.load(root+'SubhaloVrelax_fp.npy')
+
+new_type = '_new'# newest is cut at vmax = 100; new at vmax = 50; null is old format/original
+SubhaloVpeak_fp = np.load(root+'SubhaloVpeak'+new_type+'_fp.npy')
+SubhaloVpeak_fp[SubhaloVpeak_fp==0.] = SubhaloVmax_fp[SubhaloVpeak_fp==0.]
+SubhaloVinfall_fp = np.load(root+'SubhaloVinfall'+new_type+'_fp.npy')
+SubhaloVinfall_fp[SubhaloVinfall_fp==0.] = SubhaloVmax_fp[SubhaloVinfall_fp==0.]
+SubhaloVrelax_fp = np.load(root+'SubhaloVrelax'+new_type+'_fp.npy')
+SubhaloMpeak_fp = np.load(root+'SubhaloMpeak'+new_type+'_fp.npy')
+SubhaloMpeak_fp[SubhaloMpeak_fp==0.] = SubhaloMassType_fp[SubhaloMpeak_fp==0.,1]
+SubhaloMinfall_fp = np.load(root+'SubhaloMinfall'+new_type+'_fp.npy')
+SubhaloMinfall_fp[SubhaloMinfall_fp==0.] = SubhaloMassType_fp[SubhaloMinfall_fp==0.,1]
+
+#SubhaloMassInHalfRad_fp = np.load(root+'SubhaloMassInHalfRad_fp.npy')*1.e10
 
 SubhaloVmax_dm = np.load(root+'SubhaloVmax_dm.npy')
 SubhaloVelDisp_dm = np.load(root+'SubhaloVelDisp_dm.npy')
-SubhaloVpeak_dm = np.load(root+'SubhaloVpeak_dm.npy')
-SubhaloVpeak_dm[SubhaloVpeak_dm==0.] = SubhaloVmax_dm[SubhaloVpeak_dm==0.]#*20.
-SubhaloMpeak_dm = np.load(root+'SubhaloMpeak_dm.npy')*1.e10
-SubhaloVinfall_dm = np.load(root+'SubhaloVinfall_dm.npy')
-SubhaloMinfall_dm = np.load(root+'SubhaloMinfall_dm.npy')*1.e10
-SubhaloVrelax_dm = np.load(root+'SubhaloVrelax_dm.npy')
 
+SubhaloVpeak_dm = np.load(root+'SubhaloVpeak'+new_type+'_dm.npy')
+SubhaloVpeak_dm[SubhaloVpeak_dm==0.] = SubhaloVmax_dm[SubhaloVpeak_dm==0.]
+SubhaloVinfall_dm = np.load(root+'SubhaloVinfall'+new_type+'_dm.npy')
+SubhaloVinfall_dm[SubhaloVinfall_dm==0.] = SubhaloVmax_dm[SubhaloVinfall_dm==0.]
+SubhaloVrelax_dm = np.load(root+'SubhaloVrelax'+new_type+'_dm.npy')
+SubhaloMpeak_dm = np.load(root+'SubhaloMpeak'+new_type+'_dm.npy')
+SubhaloMpeak_dm[SubhaloMpeak_dm==0.] = SubhaloMassType_dm[SubhaloMpeak_dm==0.,1]
+SubhaloMinfall_dm = np.load(root+'SubhaloMinfall'+new_type+'_dm.npy')
+SubhaloMinfall_dm[SubhaloMinfall_dm==0.] = SubhaloMassType_dm[SubhaloMinfall_dm==0.,1]
+#SubhaloMassInHalfRad_dm = np.load(root+'SubhaloMassInHalfRad_dm.npy')*1.e10
+
+SubhaloVmaxRad_dm = np.load(root+'SubhaloVmaxRad_dm.npy')/1000.
+SubhaloVmaxRad_fp = np.load(root+'SubhaloVmaxRad_fp.npy')/1000.
+SubhaloMassInMaxRad_fp = np.load(root+'SubhaloMassInMaxRadType_fp.npy')[:,1]*1.e10
+SubhaloMassInMaxRad_dm = np.load(root+'SubhaloMassInMaxRadType_dm.npy')[:,1]*1.e10
+#SubhaloMassInMaxRad_dm = np.load(root+'SubhaloMassInMaxRad_dm.npy')*1.e10
+#SubhaloMassInMaxRad_fp = np.load(root+'SubhaloMassInMaxRad_fp.npy')*1.e10
+
+if want_formation:
+    peakstats_dm = np.load(root+'peakstats_dm.npy')
+
+    zpeak_dm = peakstats_dm[:,0]
+    zinfall_dm = peakstats_dm[:,1]
+    mpeak_dm = peakstats_dm[:,2]*1.e10
+    minfall_dm = peakstats_dm[:,3]*1.e10
+    dmpeak_dm = peakstats_dm[:,4]*1.e10
+    dminfall_dm = peakstats_dm[:,5]*1.e10
+    
+    peakstats_fp = np.load(root+'peakstats_fp.npy')
+
+    zpeak_fp = peakstats_fp[:,0]
+    zinfall_fp = peakstats_fp[:,1]
+    mpeak_fp = peakstats_fp[:,2]*1.e10
+    minfall_fp = peakstats_fp[:,3]*1.e10
+    dmpeak_fp = peakstats_fp[:,4]*1.e10
+    dminfall_fp = peakstats_fp[:,5]*1.e10
+
+    
+    env_cw = zpeak_fp#zpeak_dm#zinfall_dm#zpeak_fp#zinfall_fp
+    
+    
 if want_environment:
-    filename = '/home/boryanah/lars/test/CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
+    filename = '/home/boryanah/lars/LSSIllustrisTNG/CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
     f = h5py.File(filename, 'r')
     d_smooth = f['density_smooth'][:,:,:] 
 
@@ -98,28 +148,39 @@ if want_satellites:
 # stellar mass proxy
 lum_proxy = SubhaloMassType_fp[:,4]
 i_lum_sort = np.argsort(lum_proxy)[::-1]
-n_top = 13143#72000#13143#12000
+n_top = 12000#36000#13143#72000#13143#12000
 i_lum_sort = i_lum_sort[:n_top]
 if want_satellites:
     i_lum_sort, c1, c2_prop = np.intersect1d(ind_sats,i_lum_sort,return_indices=True)
 lum_proxy_sorted = lum_proxy[i_lum_sort]
 pos_fp_lsorted = SubhaloPos_fp[i_lum_sort]
 
+print("lowest mstar = ",format(np.min(lum_proxy_sorted),'.2e'))
+print("highest mstar = ",format(np.max(lum_proxy_sorted),'.2e'))
+
 # match the subhalos
-if want_environment and abundance_matched == '':
-    env_cw_sorted = env_cw[i_lum_sort]
+if (want_environment or want_formation) and abundance_matched == '':
+    #inter = inter_fp #for environment
+    inter = i_lum_sort
+    env_cw_sorted = env_cw[inter]
     if lohi == '_hi':
-        hi_quart = np.quantile(env_cw_sorted, .75)
-        i_lum_sort = i_lum_sort[env_cw_sorted > hi_quart]
-        print(len(i_lum_sort))
+        
+        hi_quart = np.quantile(env_cw_sorted, .5)
+        
+        inter = inter[env_cw_sorted >= hi_quart]
+        print("number of high objects = ",len(inter))
     elif lohi == '_lo':
-        lo_quart = np.quantile(env_cw_sorted, .25)
-        i_lum_sort = i_lum_sort[env_cw_sorted < lo_quart]
-        print(len(i_lum_sort))
+        lo_quart = np.quantile(env_cw_sorted, .5)
+        print(lo_quart)
+        inter = inter[env_cw_sorted <= lo_quart]
+        print("number of low objects = ",len(inter))
+
+    i_lum_sort = inter
         
 # get the intersected indices
 inter_fp, c1, c2 = np.intersect1d(i_lum_sort,fp_inds,return_indices=True)
-inter_dm = dmo_inds[c2]
+inter_dm = dmo_inds[c2]    
+        
 
 #print(np.sum(SubhaloMpeak_dm[inter_dm]>0.))
 #print(np.sum(SubhaloMpeak_fp[inter_fp]>0.))
@@ -129,7 +190,7 @@ inter_dm = dmo_inds[c2]
 
 print("Matched ",len(inter_dm)," out of ",n_top)
 
-proxies = ['vrelax','vpeak','mpeak','mass','vmax','vinfall','minfall','vdisp']
+proxies = ['vrelax','vpeak','mpeak','mass','vmax','vinfall','minfall','mmax']#'rmax', 'mmax','vdisp','mhalf'
 
 s = 0.5
 al = 0.5
@@ -146,7 +207,9 @@ for i in range(len(proxies)):
     if proxy == 'mass': proxy_dm = SubhaloMassType_dm[:,1]; proxy_fp = SubhaloMassType_fp[:,1]*(4.73/3.98)
     if proxy == 'vpeak': proxy_dm = SubhaloVpeak_dm; proxy_fp = SubhaloVpeak_fp
     if proxy == 'vmax': proxy_dm = SubhaloVmax_dm; proxy_fp = SubhaloVmax_fp
-    if proxy == 'halfmass': proxy_dm = SubhaloMassInHalfRad_dm; proxy_fp = SubhaloMassInHalfRad_fp
+    if proxy == 'rmax': proxy_dm = SubhaloVmaxRad_dm; proxy_fp = SubhaloVmaxRad_fp
+    if proxy == 'mhalf': proxy_dm = SubhaloMassInHalfRad_dm; proxy_fp = SubhaloMassInHalfRad_fp
+    if proxy == 'mmax': proxy_dm = SubhaloMassInMaxRad_dm; proxy_fp = SubhaloMassInMaxRad_fp
     if proxy == 'vdisp': proxy_dm = SubhaloVelDisp_dm; proxy_fp = SubhaloVelDisp_fp
     if proxy == 's2r': proxy_dm = SubhaloVelDisp_dm**2*SubhaloHalfmassRad_dm; proxy_fp = SubhaloVelDisp_fp**2*SubhaloHalfmassRad_fp
     if proxy == 'vinfall': proxy_dm = SubhaloVinfall_dm; proxy_fp = SubhaloVinfall_fp
@@ -163,7 +226,7 @@ for i in range(len(proxies)):
         proxy_dm_abund = (proxy_dm[dmo_inds])[inter_dm_abund]        
         proxy_fp_abund = np.sort(proxy_fp[inter_fp])[::-1]
 
-        if want_environment:
+        if want_environment or want_formation:
             # ordering the environment values
             #TESTINGenv_cw_sorted = (env_cw[dmo_inds])[inter_dm_abund]
             # how do you want to compute env
@@ -188,7 +251,7 @@ for i in range(len(proxies)):
             #proxy_fp = (proxy_fp[inter_fp])[i_sort]
             xlab = 'true value (DM)'
             ylab = '(SHAM(DM)-true(DM))/true(DM)'
-            if want_environment:
+            if want_environment or want_formation:
                 proxy_dm = proxy_dm[choice]
                 #proxy_fp = proxy_fp[choice]
             
@@ -196,13 +259,19 @@ for i in range(len(proxies)):
         else:
             frac = (proxy_fp_abund-proxy_dm_abund)/proxy_dm_abund
     else:
+        if want_x_fixed:
+            # change this and lim to change what's on x axis
+            #mass_dm = (SubhaloMassType_dm[inter_dm,1])
+            mass_dm = lum_proxy[inter_fp] # M_sun/h
         proxy_dm = proxy_dm[inter_dm]
         proxy_fp = proxy_fp[inter_fp]
 
-        frac = (proxy_fp-proxy_dm)/proxy_dm
+        #frac = (proxy_fp-proxy_dm)/proxy_dm
+        frac = (proxy_dm)/proxy_fp
     
     print(proxy," has over 0 = ",np.sum(proxy_fp>0.)," FP subhalos and ",np.sum(proxy_dm>0.)," DM subhalos")
-    
+
+
     plt.subplot(nrows,ncols,plot_no)
     line = np.linspace(70.,2.e15,1000)
     plt.plot(line,np.zeros(len(line)),'k--',alpha=0.3,linewidth=2.,label=proxy+env_text)
@@ -215,31 +284,42 @@ for i in range(len(proxies)):
     plt.xscale('log')
     if proxy[0] == 'v':
         xlim = [70,2000.]
-        plt.xlim(xlim)
-        yscale = 'linear'
-        grs = 50
     elif proxy[0] == 'm':
         xlim = [1.e11,2.e15]
-        plt.xlim(xlim)
-        yscale = 'linear'
-        grs = 50
+    elif proxy[0] == 'r':
+        xlim = [1.e-3,3]
 
+    if want_x_fixed:
+        #xlim = [1.e11,2.e15]
+        xlim = [1.e10,1.e13]
+    plt.xlim(xlim)
+    yscale = 'linear'
+    grs = 50        
+        
+    logm_min = np.log10(xlim[0])
+    logm_max = np.log10(xlim[1])
+
+    n_bins = 41
+    m_bins = np.logspace(logm_min,logm_max,n_bins)
+    bin_cents = .5*(m_bins[1:]+m_bins[:-1])
+    
+    if want_x_fixed:
+        r_median,r1_low,r1_high,r2_low,r2_high = compute_binned_stats(mass_dm[np.isfinite(frac)],frac[np.isfinite(frac)],m_bins)
+    else:
+        r_median,r1_low,r1_high,r2_low,r2_high = compute_binned_stats(proxy_dm[np.isfinite(frac)],frac[np.isfinite(frac)],m_bins)
+
+    print(r_median)
+    np.save('data_compare/bin_cents_'+proxy[0]+'.npy',bin_cents)
+    np.save('data_compare/med_'+proxy+lohi+'.npy',r_median)
+    np.save('data_compare/low1_'+proxy+lohi+'.npy',r1_low)
+    np.save('data_compare/high1_'+proxy+lohi+'.npy',r1_high)
+
+if False:
     #plt.scatter(proxy_dm,frac,label=proxy,s=s,alpha=al)
     plt.hexbin(proxy_dm+1.e-3, frac, gridsize=grs, bins='log', extent=(np.log10(xlim[0]),np.log10(xlim[1]),ylim[0],ylim[1]),xscale='log', yscale=yscale, cmap='Greys')
 
     plot_median(proxy_dm,frac,np.log10(xlim[0]),np.log10(xlim[1]),n_bins=41)
-    
-    if plot_no >= ntot-ncols+1:
-        plt.xlabel(xlab)
-    else:
-        plt.gca().axes.xaxis.set_ticklabels([])
-    if plot_no%ncols == 1:
-        plt.ylabel(ylab,fontsize=16)
-    else:
-        plt.gca().axes.yaxis.set_ticklabels([])
 
-plt.savefig("SHAM"+abundance_matched+"_frac"+lohi+".png")
-#plt.show()
 quit()
 
 # get the positions of the intersection

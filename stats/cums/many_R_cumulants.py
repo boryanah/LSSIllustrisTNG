@@ -15,15 +15,17 @@ opt = sys.argv[1]#"partial_fenv"#"partial_s2r"#"shuff"#"spin"#"shuff"#"conc"#"va
 # parameter choices
 Lbox = 205. # in Mpc/h
 bounds = np.array([Lbox,Lbox,Lbox])
-N_dim = 512
+N_dim = 256
 gr_size = Lbox/N_dim
-Rs = np.linspace(1,8,8)
+Rs = np.linspace(3,8,6)
 
 # load them galaxies
-gal_dir = "/home/boryanah/lars/test/Lensing/"
+ext2 = "data_2dhod_peak"
+ext1 = "data_2dhod_pos"
+gal_dir = "/home/boryanah/lars/LSSIllustrisTNG/Lensing/"
 test_name = '-'.join(opt.split('_'));print(test_name)
-pos_g = np.load(gal_dir+"true_gals.npy")
-pos_g_opt = np.load(gal_dir+proxy+"_"+opt+"_gals.npy")
+pos_g = np.load(gal_dir+ext1+"/"+"true_gals.npy")
+pos_g_opt = np.load(gal_dir+ext2+"/"+proxy+"_"+opt+"_gals.npy")
     
 # how mangy galaxies
 N_g = pos_g.shape[0]

@@ -5,31 +5,34 @@ import plotparams
 plotparams.buba()
 
 proxies = ['vrelax','s2r','mass','vinfall','vpeak','vmax','halfmass','vdisp']
-sec_props = ['mstar','parent','g-r','sSFR']
+sec_props = ['mstar','parent','g-r','sSFR','form']
 lowm = 'lowm: '
-names = ['low mass (lowm)','high mass',lowm+'satellites',lowm+'centrals',lowm+'blue',lowm+'red',lowm+'SFGs',lowm+'quiescent']
+names = ['low mass (lowm)','high mass',lowm+'satellites',lowm+'centrals',lowm+'blue',lowm+'red',lowm+'SFGs',lowm+'quiescent',lowm+'late-forming',lowm+'early-forming']
 bin_centers = np.load("data_split/bin_centers.npy")
 want_matched = '_matched'
 proxy = proxies[4]
+
+import distinct_colours
+cs = distinct_colours.get_distinct(4)
 
 nprops = len(sec_props)
 nrows = 1#2
 ncols = nprops
 ntot = nrows*ncols
-plt.subplots(nrows,ncols,figsize=(ncols*4.4,nrows*5.9))
+plt.subplots(nrows,ncols,figsize=(ncols*5.6,nrows*5.9))
 plot_no = 0
 for i in range(nprops):
     for i_bin in range(2):
         if i == 0:
             color1 = 'dodgerblue'
-            color2 = 'orange'
+            color2 = '#CC6677'
             fc1 = 'royalblue'
             
         else:
-            color1 = 'mediumblue'
-            color2 = 'mediumorchid'
-            fc1 = 'navy'#'#089FFF'
-            fc2 = 'blueviolet'
+            color1 = cs[2]#'mediumblue'
+            color2 = cs[3]#'mediumorchid'
+            fc1 = cs[2]#'navy'#'#089FFF'
+            fc2 = cs[3]#'blueviolet'
         sec_prop = sec_props[i]
         label = names[i*2+i_bin]
         ratio = np.load("data_split/SHAM"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+".npy")
@@ -64,5 +67,5 @@ for i in range(nprops):
         else:
             plt.gca().axes.yaxis.set_ticklabels([])
 
-plt.savefig("SHAM"+want_matched+"_split_ratio_all.png")
+plt.savefig("SHAM"+want_matched+"_split_ratio_all.pdf")
 #plt.show()

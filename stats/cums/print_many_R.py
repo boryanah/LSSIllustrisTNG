@@ -7,7 +7,7 @@ proxy = 'm200m'
 opts = np.array(['shuff','partial_env_cw','partial_vani','partial_s2r','partial_tot_pot'])
 
 bin_centers = np.load("data_many/rs.npy")
-chosen = 2
+chosen = 0
 print(bin_centers[chosen])
 
 # if not ratios

@@ -5,21 +5,31 @@ import plotparams
 plotparams.buba()
 
 proxies = ['vrelax','s2r','mass','vinfall','vpeak','vmax','halfmass','vdisp']
-sec_props = ['mstar','g-r','parent','sSFR']
-lowm = ''
-names = ['low mass (lowm)','high mass',lowm+'blue',lowm+'red',lowm+'satellites',lowm+'centrals',lowm+'SFGs',lowm+'quiescent']
+sec_props = ['mstar','parent','g-r','sSFR','form']
+lowm = ''#'lowm: '
+names = ['low-mass','high-mass',lowm+'centrals',lowm+'satellites',lowm+'blue',lowm+'red',lowm+'quiescent',lowm+'star-forming',lowm+'late-forming',lowm+'early-forming']
 bin_centers = np.load("data_split/bin_centers.npy")
-want_matched = '_matched'
-proxy = proxies[4]
+want_matched = ''#'_matched'
+proxy = proxies[4]#[0]#[4]
+
+import distinct_colours
+#cs = distinct_colours.get_distinct(4)
+cs = ['dodgerblue','#CC6677','#CC6677','dodgerblue','dodgerblue','#CC6677','#CC6677','dodgerblue','dodgerblue','#CC6677']
 
 nprops = len(sec_props)
 nrows = 1#2
 ncols = nprops
 ntot = nrows*ncols
-plt.subplots(nrows,ncols,figsize=(ncols*4.4,nrows*5.9))
+plt.subplots(nrows,ncols,figsize=(ncols*5.6,nrows*5.9))
 plot_no = 0
 for i in range(nprops):
     for i_bin in range(2):
+        
+        color1 = cs[i*2+0]
+        color2 = cs[i*2+1]
+        fc1 = color1
+        fc2 = color2
+
         sec_prop = sec_props[i]
         label = names[i*2+i_bin]
         ratio = np.load("data_split/SHAM"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+".npy")
@@ -31,19 +41,20 @@ for i in range(nprops):
         if i_bin == 0:
             # plot the current proxy
             # blue
-            plt.plot(bin_centers,ratio,linewidth=2.,color='#1B2ACC',label=label)#sec_prop+" "+str(i_bin))
-            plt.fill_between(bin_centers,ratio+error,ratio-error,alpha=0.1, edgecolor='#1B2ACC', facecolor='#089FFF')
+            plt.plot(bin_centers,ratio,linewidth=2.,color=color1,label=label)#sec_prop+" "+str(i_bin))
+            plt.fill_between(bin_centers,ratio+error,ratio-error,alpha=0.1, edgecolor=color1, facecolor=fc1)
+            #plt.errorbar(bin_centers,ratio,yerr=error,ls='-',c=color1,fmt='o',capsize=4,label=label)#sec_prop+" "+str(i_bin))
+
+            #elif i_bin == 1 and i == 0:
+            # orange onesc
+            #plt.errorbar(bin_centers,ratio,yerr=error,ls='-',c=color2,fmt='o',capsize=4,label=label)#sec_prop+" "+str(i_bin))
         else:
-            # orange ones
-            plt.errorbar(bin_centers,ratio,yerr=error,ls='-',c='orange',fmt='o',capsize=4,label=label)#sec_prop+" "+str(i_bin))
-
-        # always plot the fiducial
-        #plt.plot(bin_centers,ratio_fid,linewidth=2.,color='#1B2ACC')
-        #plt.fill_between(bin_centers,ratio_fid+error_fid,ratio_fid-error_fid,alpha=0.1, edgecolor='#1B2ACC', facecolor='#089FFF')
-
-        plt.legend()
-        plt.ylim([0.7,1.3])
-        #origplt.xlim([.7,15])
+            plt.plot(bin_centers,ratio,linewidth=2.,color=color2,label=label)
+            plt.fill_between(bin_centers,ratio+error,ratio-error,alpha=0.1, edgecolor=color2, facecolor=fc2)
+            
+        plt.legend(loc='upper right')
+        plt.ylim([0.,3.])#2#plt.ylim([0.7,1.3])
+        
         plt.xlim([.2,15])
         plt.xscale('log')
 
@@ -54,5 +65,5 @@ for i in range(nprops):
         else:
             plt.gca().axes.yaxis.set_ticklabels([])
 
-plt.savefig("SHAM"+want_matched+"_split_ratio_all.png")
-#plt.show()
+plt.savefig("SHAM"+want_matched+"_split_ratio_all.pdf")
+plt.show()

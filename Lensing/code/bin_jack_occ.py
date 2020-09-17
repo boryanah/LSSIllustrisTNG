@@ -16,6 +16,8 @@ periodic = True
 dir_part = "/mnt/gosling1/boryanah/TNG300/"
 part_fn = "parts_position_tng300-3_99.npy"
 proxy = "m200m"
+ext2 = "data_2dhod_peak" # old version of the code
+ext1 = "data_2dhod_pos"
 opt = sys.argv[1]#"partial_fenv"#"partial_s2r"#"shuff"#"spin"#"shuff"#"conc"#"vani"#"shuff"#"env"#"partial_vani""partial_s2r""vdisp"
 
 Lbox = 205. # in Mpc/h
@@ -45,7 +47,7 @@ if test:
     z = np.random.uniform(0, Lbox, Npts)
     pos_g = np.vstack((x, y, z)).T
 else:
-    pos_g = np.load("../true_gals.npy")
+    pos_g = np.load("../"+ext1+"/true_gals.npy").astype(np.float32)
 
 if test:
     Npts = int(1.2e4)
@@ -54,7 +56,7 @@ if test:
     z = np.random.uniform(0, Lbox, Npts)
     pos_g_opt = np.vstack((x, y, z)).T
 else:
-    pos_g_opt = np.load("../"+proxy+"_"+opt+"_gals.npy")
+    pos_g_opt = np.load("../"+ext2+"/"+proxy+"_"+opt+"_gals.npy").astype(np.float32)
 
 if fiducial == False:
     pos_g = pos_g_opt.copy()

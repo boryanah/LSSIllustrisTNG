@@ -17,6 +17,7 @@ root = '/home/boryanah/lars/data_2500/'
 np.random.seed(300)
 
 # parameter choices
+want_fp_pos = 1 # do you want to take the galaxy positions from the FP sim
 proxy = 'm200m'
 opt = sys.argv[1]#'partial_fenv'
 percent_thresh = 5./100.
@@ -50,7 +51,7 @@ GroupVelAnis_dm_part = np.load(root+'GroupVelAnis_dm_300000.npy')
 SubhaloVpeak_dm = np.load(root+'SubhaloVpeak_dm.npy')
 if opt == "partial_env_cw":
     # Density in Illustris
-    filename = '/home/boryanah/lars/test/CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
+    filename = '/home/boryanah/lars/LSSIllustrisTNG/CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
     f = h5py.File(filename, 'r')
     d_smooth = f['density_smooth'][:,:,:] 
 
@@ -72,6 +73,9 @@ SubhaloGrNr_fp = np.load(root+'SubhaloGrNr_fp.npy')
 SubhaloPos_fp = np.load(root+'SubhaloPos_fp.npy')/1000.
 SubhaloMassType_fp = np.load(root+'SubhaloMassType_fp.npy')
 SubhaloLenType_fp = np.load(root+'SubhaloLenType_fp.npy')
+# wicked testing
+Group_M_Crit200_fp = np.load(root+'Group_M_Crit200_fp.npy')
+
 
 # numbers of halos
 N_halo_dm = len(Group_M_Mean200_dm)
@@ -128,7 +132,7 @@ inds_sub_fp = inds_sub_fp[np.sum(pos_gal_fp,axis=1)!=0.]
 m_sub_gals = m_sub_gals[np.sum(pos_gal_fp,axis=1)!=0.]
 parent_gal_fp = parent_gal_fp[np.sum(pos_gal_fp,axis=1)!=0.]
 pos_gal_fp = pos_gal_fp[np.sum(pos_gal_fp,axis=1)!=0.]
-            
+
 # galaxy numbers
 N_gal = len(inds_sub_fp)
 n_gal = N_gal/Lbox**3
@@ -172,16 +176,40 @@ n_arr = np.array(n_arr)
 n_arr = n_arr.astype(int)
 n_bins = len(n_arr)
 
-# for each halo, how many gal point to it (excluding case of 0) and index of halo
-parent_gal_un_fp,counts = np.unique(parent_gal_fp,return_counts=True)
 
 # counts of gals for all halos
 count_halo_fp = np.zeros(N_halo_fp,dtype=int)
 count_halo_dm = np.zeros(N_halo_dm,dtype=int)
-count_halo_fp[parent_gal_un_fp] += counts
 
-# use me when excluding the 2063 objext and the matched halos are 1:1
-count_halo_dm[dmo_inds_halo] += count_halo_fp[fp_inds_halo]
+if want_fp_pos:
+    # nstart of gals for all halos
+    nstart_halo_fp = np.zeros(N_halo_fp,dtype=int)-1
+    nstart_halo_dm = np.zeros(N_halo_dm,dtype=int)-1
+    
+    # for each halo, how many gal point to it (excluding case of 0) and index of halo
+    # order the parents they are already sorted
+    new_sort = np.argsort(parent_gal_fp)
+
+    # order the positions by parents. index returns indices of first occurrence
+    pos_gal_fp_nsorted = pos_gal_fp[new_sort]
+    parent_gal_un_fp, index,counts = np.unique(parent_gal_fp[new_sort],return_index=True,return_counts=True)
+    # npstart is like the cumulative npout starting from 0
+    nstart = np.cumsum(counts)
+    nstart[1:] = nstart[:-1]
+    nstart[0] = 0
+
+    count_halo_fp[parent_gal_un_fp] = counts
+    nstart_halo_fp[parent_gal_un_fp] = nstart
+    count_halo_dm[dmo_inds_halo] += count_halo_fp[fp_inds_halo]
+    nstart_halo_dm[dmo_inds_halo] = nstart_halo_fp[fp_inds_halo]
+else:
+    # for each halo, how many gal point to it (excluding case of 0) and index of halo
+    parent_gal_un_fp,counts = np.unique(parent_gal_fp,return_counts=True)
+                
+    count_halo_fp[parent_gal_un_fp] += counts
+    # use me when excluding the 2063 objext and the matched halos are 1:1
+    count_halo_dm[dmo_inds_halo] += count_halo_fp[fp_inds_halo]
+
 print("sum halo dm = ",np.sum(count_halo_dm))
 print("sum halo fp = ",np.sum(count_halo_fp))
 
@@ -282,13 +310,19 @@ def get_counts(halo_dm_sorted,r_corr,reverse_ordering):
 
     # back to original mass order 
     dmo_inds_halo_shuff = dmo_inds_halo_shuff_sorted[i_sort_rev]
-
+    
     # get the counts for the reordered galaxies
     count_halo_dm_shuff = np.zeros(N_halo_dm,dtype=int)
     count_halo_dm_shuff[dmo_inds_halo_shuff] += count_halo_fp[fp_inds_halo]
     count_halo_dm_shuff[np.logical_not(active)] = 0.
 
-    return count_halo_dm_shuff
+    if want_fp_pos:
+        # start of the subhalos
+        nstart_halo_dm_shuff = np.zeros(N_halo_dm,dtype=int)-1
+        nstart_halo_dm_shuff[dmo_inds_halo_shuff] = nstart_halo_fp[fp_inds_halo]
+        return count_halo_dm_shuff, nstart_halo_dm_shuff
+    else:
+        return count_halo_dm_shuff
 
 # assigning galaxies to halos
 def get_weights(counts):
@@ -307,6 +341,47 @@ def get_weights(counts):
         chosens = i_sub[sor_sub]
         weights[chosens[:N_g]] = 1.
     return weights
+
+def get_xyz_fp_pos(nstart_halo,count_halo,want_pruning=True,wicked_testing=False):
+
+    N_hal = np.sum(count_halo > 0.5)
+    N_gal = np.sum(count_halo)
+    
+    xyz = np.zeros((N_gal,3))
+
+    cou = count_halo[count_halo > 0.5]
+    nst = nstart_halo[count_halo > 0.5]
+    if wicked_testing:
+        grfir = GroupFirstSub_fp[count_halo > 0.5]
+    else:
+        grfir = GroupFirstSub_dm[count_halo > 0.5]
+    cum = 0
+
+    for k in range(N_hal):
+        
+        pos = pos_gal_fp_nsorted[nst[k]:nst[k]+cou[k]]
+        pos -= pos_gal_fp_nsorted[nst[k]]
+
+        if wicked_testing:
+            xyz[cum:cum+cou[k]] = pos+SubhaloPos_fp[grfir[k]]
+        else:
+            xyz[cum:cum+cou[k]] = pos+SubhaloPos_dm[grfir[k]]
+        cum += cou[k]
+
+
+    if want_pruning:
+        x = xyz[:,0];y = xyz[:,1];z = xyz[:,2]
+        #w = np.full_like(x,1.)
+
+        x[x<0.] = Lbox-x[x<0.]
+        z[z<0.] = Lbox-z[z<0.]
+        y[y<0.] = Lbox-y[y<0.]
+        x[x>Lbox] = -Lbox+x[x>Lbox]
+        z[z>Lbox] = -Lbox+z[z>Lbox]
+        y[y>Lbox] = -Lbox+y[y>Lbox]
+        xyz = np.vstack((x,y,z)).T
+        
+    return xyz
 
 def get_xyz(weights,want_weights=False,want_pruning=False):
     if want_pruning:
@@ -480,9 +555,13 @@ def get_corr(xyz,wei=None,want_plot=None):
 
 def get_chi2(r_corr,halo_dm_sorted,rev,verbose=False):
     if r_corr > 1. or r_corr < 0.: return np.inf
-    count_halo = get_counts(halo_dm_sorted,r_corr=r_corr,reverse_ordering=rev)
-    weight_sub = get_weights(count_halo)
-    xyz = get_xyz(weight_sub)
+    if want_fp_pos:
+        count_halo, nstart_halo = get_counts(halo_dm_sorted,r_corr=r_corr,reverse_ordering=rev)
+        xyz = get_xyz_fp_pos(nstart_halo,count_halo)
+    else:
+        count_halo = get_counts(halo_dm_sorted,r_corr=r_corr,reverse_ordering=rev)
+        weight_sub = get_weights(count_halo)
+        xyz = get_xyz(weight_sub)
     corr = get_corr(xyz,want_plot=None)
     dcorr = corr_dm-corr
     chi2 = np.dot(dcorr,np.dot(prec,dcorr))
@@ -497,12 +576,15 @@ inds_dm = np.arange(N_halo_dm)
 inds_sub_dm = np.arange(N_sub_dm)
 
 # corr func of the true galaxy distribution
-weights_sub = get_weights(count_halo_dm)
-xyz_dm = get_xyz(weights_sub)
+if want_fp_pos:
+    xyz_dm = get_xyz_fp_pos(nstart_halo_dm,count_halo_dm)
+else:
+    weights_sub = get_weights(count_halo_dm)
+    xyz_dm = get_xyz(weights_sub)
 corr_dm = get_corr(xyz_dm)
 
 # get the fiducial values
-bin_centers, xi_fp_mean,xi_fp_err,xi_dm_mean,xi_dm_err,xi_fid_shuff,xi_fid_shuff_err,rat_fid_shuff,rat_fid_shuff_err = np.loadtxt('/home/boryanah/lars/test/figs/paper/Corr_shuff_'+proxy+'.txt',unpack=True)
+bin_centers, xi_fp_mean,xi_fp_err,xi_dm_mean,xi_dm_err,xi_fid_shuff,xi_fid_shuff_err,rat_fid_shuff,rat_fid_shuff_err = np.loadtxt('/home/boryanah/lars/LSSIllustrisTNG/figs/paper/Corr_shuff_'+proxy+'.txt',unpack=True)
 xi_fp_err /= bin_centers**2
 
 print("starting bin = ",bin_centers[i_r_start])
@@ -526,29 +608,47 @@ r = res.x
 print("r =",r)
 
 
-# get counts and weights
-count_halo_dm_shuff = get_counts(par_halo_dm_sorted,r_corr=r,reverse_ordering=reverse)
-weights_sub_shuff = get_weights(count_halo_dm_shuff)
-xyz_sh = get_xyz(weights_sub_shuff)
+# get counts and weights of the final answer
+if want_fp_pos:
+    count_halo_dm_shuff, nstart_halo_dm_shuff = get_counts(par_halo_dm_sorted,r_corr=r,reverse_ordering=reverse)
+    xyz_sh = get_xyz_fp_pos(nstart_halo_dm_shuff,count_halo_dm_shuff)
+else:
+    count_halo_dm_shuff = get_counts(par_halo_dm_sorted,r_corr=r,reverse_ordering=reverse)
+    weights_sub_shuff = get_weights(count_halo_dm_shuff)
+    xyz_sh = get_xyz(weights_sub_shuff)
 
 if want_fp_pos:
     ext = "pos"
 else:
     ext = "peak"
 
+# get positions of the full physics galaxies
+# TESTING WICKED IDEA
+#xyz_fp = pos_gal_fp
+'''
+i_sort = np.argsort(Group_M_Crit200_fp[fp_inds_halo])[::-1]
+i_sort_rev = np.argsort(i_sort)
+active = np.ones(N_halo_fp,dtype=bool)
+active_sorted = (active[fp_inds_halo])[i_sort]
+active_sorted[:N_exc_mm+2] = False
+active[fp_inds_halo] = active_sorted[i_sort_rev]
+count_halo_fp[np.logical_not(active)] = 0.
+xyz_fp = get_xyz_fp_pos(nstart_halo_fp,count_halo_fp,wicked_testing=True)
+print(xyz_fp.shape)
+'''
+
 # save positions of the reordered galaxies
 np.save("../Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals.npy",xyz_sh)
 
 fs = (12,8)
 fig = plt.figure(figsize=fs)
+#corr_fp = get_corr(xyz_fp,want_plot='Full-physics')
 corr_dm = get_corr(xyz_dm,want_plot='Dark Matter')
 corr_sh = get_corr(xyz_sh,want_plot='Reordered')
 plt.legend()
 plt.savefig('figs/Corrs.png')
 plt.show()
 plt.close()
-quit()
-# get positions of the full physics galaxies
-xyz_fp = pos_gal_fp
-get_jacked_corrs(xyz_fp,xyz_dm,xyz_sh,want_plots=True)
+
+
 

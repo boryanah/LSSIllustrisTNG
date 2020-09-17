@@ -9,35 +9,39 @@ import sys
 
 st_cut = 10000
 
-want_fp_pos = 1 # do you want to take the galaxy position from the FP galaxies
+want_fp_pos = 0 # do you want to take the galaxy position from the FP galaxies
+if want_fp_pos:
+    want_existing_dm = 1 # use closest dm subhalo in the halo
 if len(sys.argv) > 1:
     if sys.argv[1] == '--help':
         print('proxy = m200c m200m mfof vmax vpeak m500c s2r')
-        print('opt = env_cw spin vdisp min_pot tot_pot s2r vani vir moverr nsubs form env_mass vpeak concs concl env shuff conc partial_fenv partial_min_pot partial_tot_pot partial_s2r partial_vani submass m200m')
+        print('opt = env_cw env_avg spin vdisp min_pot tot_pot s2r vani vir moverr nsubs form env_mass vpeak concs concl env shuff conc partial_fenv partial_min_pot partial_tot_pot partial_s2r partial_vani submass m200m')
         exit(1)
     
     opt = sys.argv[2]
     if opt[:7] == 'partial':
         r = sys.argv[3]; mean = [0, 0]#.5#.2
-        cov = [[1, float(r)], [float(r), 1]]; print(r)                  
+        cov = [exc[1, float(r)], [float(r), 1]]; print(r)                  
     proxy = sys.argv[1]
 else:
     opt = 'shuff'#'spin'#'vdisp'#'vani'#'env_mass'#'shuff'#'form'#'env_mass'#'vpeak'#'concs'#'concl'#'env'#'shuff' #'conc'
     proxy = 'm200m'#'m200m'#'mfof'#'vmax'#'vpeak'#'' 
 binning = 'range'#'std' #'range'
 fix_1bin = True
-exclude_most_mass = True
+exclude_most_mass = 1
 N_exc_mm = 100#100#30#100
 show_fid = False#True
 if fix_1bin == True:
     skip = 500
-    from mpi4py import MPI
-    i_bin = MPI.COMM_WORLD.Get_rank()*skip
+    #from mpi4py import MPI
+    i_bin = 0#TESTINGMPI.COMM_WORLD.Get_rank()*skip
     offset = 0
     i_bin += offset
     
 percent_num = 5
 
+def get_d2(pos1,pos2):
+    return np.sum((pos1-pos2)**2,axis=1)
 
 percent_thresh = percent_num/100.
 # bro nikva ideq tova kakvo
@@ -272,7 +276,7 @@ inds_sub_fp = inds_sub_fp[np.sum(pos_gal_fp,axis=1)!=0.]
 m_sub_gals = m_sub_gals[np.sum(pos_gal_fp,axis=1)!=0.]
 parent_gal_fp = parent_gal_fp[np.sum(pos_gal_fp,axis=1)!=0.]
 pos_gal_fp = pos_gal_fp[np.sum(pos_gal_fp,axis=1)!=0.]
-            
+
 # galaxy numbers
 N_gal = len(inds_sub_fp)
 n_gal = N_gal/Lboxs[i]**3
@@ -299,11 +303,8 @@ i_cut = np.sort(i_sort)
 i_sort_rev = np.argsort(i_sort)
 fp_inds_halo = fp_inds_halo[i_cut]
 dmo_inds_halo = dmo_inds_halo[i_cut]
-if proxy == 's2r':
-    #M_200c_dm = 1./M_200c_dm
-    i_sort = np.argsort(M_200c_dm[dmo_inds_halo])[::-1]
-else:
-    i_sort = np.argsort(M_200c_dm[dmo_inds_halo])[::-1]
+i_sort = np.argsort(M_200c_dm[dmo_inds_halo])[::-1]
+
 N_matched = len(i_sort)
 print("N_matched = ",N_matched)
 i_sort_rev = np.argsort(i_sort)
@@ -335,6 +336,8 @@ n_arr = np.array(n_arr)
 
 # minimum halo mass in the HOD
 M_200c_dm_min = np.min(M_200c_dm[dmo_inds_halo])
+print("minimum mass is %.1e"%M_200c_dm_min)
+
 
 if want_fp_pos:
     # for each halo, how many gal point to it (excluding case of 0) and index of halo
@@ -344,6 +347,10 @@ if want_fp_pos:
 
     # order the positions by parents. index returns indices of first occurrence
     pos_gal_fp_nsorted = pos_gal_fp[new_sort]
+
+    if want_existing_dm:
+        ind_gal_fp_nsorted = inds_sub_fp[new_sort]
+
     parent_gal_un_fp, index,counts = np.unique(parent_gal_fp[new_sort],return_index=True,return_counts=True)
     # npstart is like the cumulative npout starting from 0
     nstart = np.cumsum(counts)
@@ -423,8 +430,9 @@ env_mass_halo_dm = np.load(root+'env_mass_dm.npy')
 env_halo_dm = np.load(root+'env_dm.npy')
 env_mass_halo_dm_sorted = (env_mass_halo_dm[dmo_inds_halo])[i_sort]
 env_halo_dm_sorted = (env_halo_dm[dmo_inds_halo])[i_sort]
+env_avg_dm = np.load(root+'GroupEnvs_dm.npy')
 
-if opt == "env_cw":
+if opt == "env_cw" or opt == "env_avg":
     # Density in Illustris
     filename = 'CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
     f = h5py.File(filename, 'r')
@@ -441,6 +449,39 @@ if opt == "env_cw":
     # Environment definition
     env_cw = d_smooth[i_cw,j_cw,k_cw]
     env_cw_halo_dm_sorted = (env_cw[dmo_inds_halo])[i_sort]
+
+
+# Different definitions of the average environment
+# epochs are 55, 65, 75, 85, 95, 99 (env_cw being 99)
+# averaging last three
+if opt == 'env_avg':
+    avg_epochs = int(sys.argv[3])#1, 2, 3, 4, 5, 6
+else: avg_epochs = 0
+if avg_epochs == 6:
+    env_avg_dm = env_avg_dm[:,-5:]
+    env_avg_dm = np.vstack((env_avg_dm.T,env_cw)).T
+    env_avg_dm = np.mean(env_avg_dm,axis=1)
+if avg_epochs == 5:
+    env_avg_dm = env_avg_dm[:,-4:]
+    env_avg_dm = np.vstack((env_avg_dm.T,env_cw)).T
+    env_avg_dm = np.mean(env_avg_dm,axis=1)
+if avg_epochs == 4:
+    env_avg_dm = env_avg_dm[:,-3:]
+    env_avg_dm = np.vstack((env_avg_dm.T,env_cw)).T
+    env_avg_dm = np.mean(env_avg_dm,axis=1)
+if avg_epochs == 3:
+    env_avg_dm = env_avg_dm[:,-2:]
+    env_avg_dm = np.vstack((env_avg_dm.T,env_cw)).T
+    env_avg_dm = np.mean(env_avg_dm,axis=1)
+if avg_epochs == 2:
+    env_avg_dm = env_avg_dm[:,-1:]
+    env_avg_dm = np.vstack((env_avg_dm.T,env_cw)).T
+    env_avg_dm = np.mean(env_avg_dm,axis=1)
+if avg_epochs == 1:
+    env_avg_dm = env_cw
+
+# psos mo re abg
+env_avg_halo_dm_sorted = (env_avg_dm[dmo_inds_halo])[i_sort]
 
 # sort Nsubs
 nsubs_halo_dm_sorted = ((GroupNsubs_dm)[dmo_inds_halo])[i_sort]
@@ -648,6 +689,8 @@ while N_old < N_matched:
             opt_sorted = env_mass_halo_dm_sorted[N_old:N_temp]
         elif opt == 'env':
             opt_sorted = env_halo_dm_sorted[N_old:N_temp]
+        elif opt == 'env_avg':
+            opt_sorted = env_avg_halo_dm_sorted[N_old:N_temp]
         elif opt == 'env_cw':
             opt_sorted = env_cw_halo_dm_sorted[N_old:N_temp]
         elif opt == 'min_pot' or opt == 'partial_min_pot':
@@ -833,18 +876,66 @@ if want_fp_pos:
     grfir_shuff = GroupFirstSub_dm[count_halo_dm_shuff > 0.5]
     cum_shuff = 0
     for k in range(N_hal):
+        if k % 100 == 0: print("k = ",k)
         
         pos = pos_gal_fp_nsorted[nst[k]:nst[k]+cou[k]]
-        pos -= pos_gal_fp_nsorted[nst[k]]#pos_gal_first_fp[k]
-        
-        xyz_DM[cum:cum+cou[k]] = pos+SubhaloPos_dm[grfir[k]]
+        pos -= pos_gal_fp_nsorted[nst[k]]
+
+
+        if want_existing_dm:
+            inds_in_halo = ind_gal_fp_nsorted[nst[k]:nst[k]+cou[k]]
+            gals_in_halo = pos+SubhaloPos_dm[grfir[k]]
+
+            gals_dm = SubhaloPos_dm[grfir[k]]
+            
+            for i_gal in range(1,len(inds_in_halo)):
+                ind = inds_in_halo[i_gal]
+                mask = (ind == fp_inds)
+                if np.sum(mask) == 2:#1:
+                    i_match = dmo_inds[mask]
+                    gals_dm = np.vstack((gals_dm,SubhaloPos_dm[i_match]))
+                    print("matched in proper way")
+                else:
+                    pos_gal = gals_in_halo[i_gal]
+                    d2 = get_d2(pos_gal,SubhaloPos_dm)
+                    i_d2 = np.argmin(d2)
+                    print(d2[i_d2])
+                    gals_dm = np.vstack((gals_dm,SubhaloPos_dm[i_d2]))
+                    print("matched by positition")
+            
+            xyz_DM[cum:cum+cou[k]] = gals_dm
+        else:
+            xyz_DM[cum:cum+cou[k]] = pos+SubhaloPos_dm[grfir[k]]
         cum += cou[k]
 
-
-        #if k == 23: quit()
         pos_shuff = pos_gal_fp_nsorted[nst_shuff[k]:nst_shuff[k]+cou_shuff[k]]
-        pos_shuff -= pos_gal_fp_nsorted[nst_shuff[k]]#pos_gal_first_fp[k]
-        xyz_shuff[cum_shuff:cum_shuff+cou_shuff[k]] = pos_shuff+SubhaloPos_dm[grfir_shuff[k]]
+        pos_shuff -= pos_gal_fp_nsorted[nst_shuff[k]]
+        if False:#want_existing_dm:
+            inds_in_halo = ind_gal_fp_nsorted[nst_shuff[k]:nst_shuff[k]+cou_shuff[k]]
+            
+            gals_in_halo = pos_shuff+SubhaloPos_dm[grfir_shuff[k]]
+
+            gals_dm = SubhaloPos_dm[grfir_shuff[k]]
+
+            for i_gal in range(1,len(gals_in_halo)):
+                ind = inds_in_halo[i_gal]
+                mask = (ind == fp_inds)
+                if np.sum(mask) == 1:
+                    i_match = dmo_inds[mask]
+                    gals_dm = np.vstack((gals_dm,SubhaloPos_dm[i_match]))
+                    print("matched in proper way")
+                else:
+                    pos_gal = gals_in_halo[i_gal]
+                    d2 = get_d2(pos_gal,SubhaloPos_dm)
+                    i_d2 = np.argmin(d2)
+                    print(d2[i_d2])
+                    gals_dm = np.vstack((gals_dm,SubhaloPos_dm[i_d2]))
+                    print("matched by positition")
+            
+
+            xyz_shuff[cum_shuff:cum_shuff+cou_shuff[k]] = gals_dm
+        else:
+            xyz_shuff[cum_shuff:cum_shuff+cou_shuff[k]] = pos_shuff+SubhaloPos_dm[grfir_shuff[k]]
         cum_shuff += cou_shuff[k]
     # subtract the central galaxy tuki
 

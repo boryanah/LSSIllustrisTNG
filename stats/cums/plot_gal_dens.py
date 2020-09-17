@@ -4,6 +4,7 @@ import itertools
 import sys
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
+import h5py
 
 # do the computation for the true galaxies?
 want_true = 0
@@ -20,11 +21,13 @@ gr_size = Lbox/N_dim
 R = 3.#float(sys.argv[3])#4
 
 # load them galaxies
-gal_dir = "/home/boryanah/lars/test/Lensing/"
+ext2 = 'data_2dhod_peak'
+ext1 = 'data_2dhod_pos'
+gal_dir = "/home/boryanah/lars/LSSIllustrisTNG/Lensing/"
 test_name = '-'.join(opt.split('_'));print(test_name)
-pos_g = np.load(gal_dir+"true_gals.npy")
-pos_g_opt = np.load(gal_dir+proxy+"_"+opt+"_gals.npy")
-    
+pos_g = np.load(gal_dir+ext1+"/"+"true_gals.npy")
+pos_g_opt = np.load(gal_dir+ext2+"/"+proxy+"_"+opt+"_gals.npy")
+
 # how mangy galaxies
 N_g = pos_g.shape[0]
 N_g_opt = pos_g_opt.shape[0]
@@ -67,7 +70,7 @@ D_g_smo = gaussian_filter(D_g,R)
 # fast
 D_g_opt_smo = gaussian_filter(D_g_opt,R)
 
-slice_id = 20
+slice_id = 200#20
 Dens = D_g_smo[:,slice_id,:]
 Dopt = D_g_opt_smo[:,slice_id,:]
 Diff = Dens-Dopt
@@ -79,7 +82,9 @@ Dneg = np.abs(Dneg)
 
 cm = 'gist_stern'#'prism'#'jet'#'gist_stern'#'jet'#'gist_stern'
 cm2 = 'terrain'#'Spectral'#'gist_rainbow'
+
 al = 0.4
+'''
 plt.subplots(1,3,figsize=(15,5))
 plt.subplot(1,3,1)
 plt.imshow(Dens,cmap=cm2)
@@ -95,18 +100,18 @@ plt.colorbar()
 #plt.savefig("figs/cums_"+proxy+"_"+opt+".png")
 #plt.show()
 plt.close()
-
+'''
 nrows = 1
 ncols = 2
 plt.subplots(nrows,ncols,figsize=(15,5))
 plt.subplot(nrows,ncols,1)
 plt.imshow(Dens,cmap=cm2)
 #plt.imshow(Dpos,cmap=cm,alpha=al)
-plt.colorbar()
+#plt.colorbar()
 plt.subplot(nrows,ncols,2)
 plt.imshow(Dens,cmap=cm2)
 plt.imshow(Dneg,cmap=cm,alpha=al)
-plt.colorbar()
-plt.savefig("figs/cums_"+proxy+"_"+opt+".png")
-plt.show()
+#plt.colorbar()
+plt.savefig("cums_"+proxy+"_"+opt+".pdf")
+#plt.show()
 plt.close()

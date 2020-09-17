@@ -11,6 +11,9 @@ import os
 dir_part = "/mnt/gosling1/boryanah/TNG300/"
 part_fn = "parts_position_tng300-3_99.npy"
 proxy = "m200m"
+ext1 = "data_2dhod_pos"
+ext2 = "data_2dhod_peak"
+
 opt = sys.argv[1]#"shuff"#"spin"#"shuff"#"conc"#"vani"#"shuff"#"env"
 
 Lbox = 205. # in Mpc/h
@@ -25,7 +28,7 @@ N_parts_down = N_parts//40#used to be 4
 down_parts_fname = "../pos_parts_down_"+str(N_parts_down)+".npy"
 
 
-test = False#True
+test = False
 if os.path.isfile(down_parts_fname):
     pos_parts = np.load(down_parts_fname)
 else:
@@ -48,7 +51,7 @@ if test:
     z = np.random.uniform(0, Lbox, Npts)
     pos_gals = np.vstack((x, y, z)).T
 else:
-    pos_gals = np.load("../true_gals.npy")
+    pos_gals = np.load("../"+ext1+"/true_gals.npy")
 
 if test:
     Npts = int(1.2e4)
@@ -57,7 +60,7 @@ if test:
     z = np.random.uniform(0, Lbox, Npts)
     pos_gals_opt = np.vstack((x, y, z)).T
 else:
-    pos_gals_opt = np.load("../"+proxy+"_"+opt+"_gals.npy")
+    pos_gals_opt = np.load("../"+ext2+"/"+proxy+"_"+opt+"_gals.npy")
 
 down_fac = N_parts/N_parts_down
 pcle_mass *= down_fac
