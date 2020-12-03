@@ -17,16 +17,16 @@ root = '/home/boryanah/lars/data_2500/'
 np.random.seed(300)
 
 # parameter choices
-want_fp_pos = 1 # do you want to take the galaxy positions from the FP sim
+want_fp_pos = 0 # do you want to take the galaxy positions from the FP sim
 proxy = 'm200m'
 opt = sys.argv[1]#'partial_fenv'
 percent_thresh = 5./100.
 gal_cut = 10000
-N_exc_mm = 100
+N_exc_mm = 100#0# for bias and corr plot #100 # for rest of paper
 # r-bins to do the matching
 i_r_start = -15
 #i_r_end = 0#-1
-
+want_minimize = 0 # we are giving the r coefficient as sys.argv
 # where to save images
 figname = 'Corr_'+proxy+'.png'
 
@@ -51,8 +51,9 @@ GroupVelAnis_dm_part = np.load(root+'GroupVelAnis_dm_300000.npy')
 SubhaloVpeak_dm = np.load(root+'SubhaloVpeak_dm.npy')
 if opt == "partial_env_cw":
     # Density in Illustris
-    filename = '/home/boryanah/lars/LSSIllustrisTNG/CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
-    f = h5py.File(filename, 'r')
+    fdir = '/mnt/store1/boryanah/IllustrisTNG/CosmicWeb'
+    filename = 'WEB_CIC_256_DM_TNG300-2.hdf5'
+    f = h5py.File(fdir+filename, 'r')
     d_smooth = f['density_smooth'][:,:,:] 
 
     # finding who belongs where in the cosmic web
@@ -602,10 +603,13 @@ if opt == 'partial_tot_pot':  par_halo_dm_sorted = tot_pot_halo_dm_sorted; rever
 if opt == 'partial_min_pot':  par_halo_dm_sorted = min_pot_halo_dm_sorted; reverse = 0
 
 # run minimizer
-r = 0.5
-res = minimize(get_chi2, r, args=(par_halo_dm_sorted,reverse), method='powell',options={'xtol': 1.e-4, 'disp': True})
-r = res.x
-print("r =",r)
+if want_minimize:
+    r = 0.5
+    res = minimize(get_chi2, r, args=(par_halo_dm_sorted,reverse), method='powell',options={'xtol': 1.e-4, 'disp': True})
+    r = res.x
+    print("r =",r)
+else:
+    r = float(sys.argv[2])
 
 
 # get counts and weights of the final answer
@@ -638,17 +642,19 @@ print(xyz_fp.shape)
 '''
 
 # save positions of the reordered galaxies
-np.save("../Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals.npy",xyz_sh)
-
+if N_exc_mm == 0:
+    np.save("../Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals_all.npy",xyz_sh)
+else:
+    # TESTING
+    #np.save("../Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals.npy",xyz_sh)
+    np.save("../Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals_perfect.npy",xyz_sh)
+    
 fs = (12,8)
 fig = plt.figure(figsize=fs)
 #corr_fp = get_corr(xyz_fp,want_plot='Full-physics')
 corr_dm = get_corr(xyz_dm,want_plot='Dark Matter')
 corr_sh = get_corr(xyz_sh,want_plot='Reordered')
 plt.legend()
-plt.savefig('figs/Corrs.png')
-plt.show()
+plt.savefig('figs/Corrs_'+opt+'.png')
+#plt.show()
 plt.close()
-
-
-

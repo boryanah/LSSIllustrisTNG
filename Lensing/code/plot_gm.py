@@ -77,16 +77,16 @@ for i in range(nprops):
                 lab_fid = ''
             plt.plot(bin_centers,bias_fid,linewidth=2.,color=fid_color,label=lab_fid)
             plt.fill_between(bin_centers,bias_fid+bias_error_fid,bias_fid-bias_error_fid,alpha=0.1, edgecolor=fid_color, facecolor=fid_color2)
-            plt.legend(loc='upper left')
+            plt.legend(loc='upper left',frameon=False)
         else:
             lab_fid = ''
             plt.plot(bin_centers,corr_coeff_fid,linewidth=2.,color=fid_color,label=lab_fid)
             plt.fill_between(bin_centers,corr_coeff_fid+corr_coeff_error_fid,corr_coeff_fid-corr_coeff_error_fid,alpha=0.1, edgecolor=fid_color, facecolor=fid_color2)
             
         if i_type == 0:
-            plt.ylim([0.7,1.5])
+            plt.ylim([0.95,1.8])#plt.ylim([0.7,1.5])
         if i_type == 1:
-            plt.ylim([0.5,1.32])
+            plt.ylim([0.92,1.12])#plt.ylim([0.5,1.32])
         #origplt.xlim([.7,15])
         plt.xlim([.7,15])
         plt.xscale('log')
@@ -94,11 +94,11 @@ for i in range(nprops):
         if plot_no >= ntot-ncols+1:
             plt.xlabel(r'$r$ [Mpc/h]')
         if plot_no%ncols == 1 and i_type == 0:
-            plt.ylabel(r'$(\xi_{\rm gg}/\xi_{\rm mm})^{1/2}$')
+            plt.ylabel(r'$\tilde b (r) = (\xi_{\rm gg}/\xi_{\rm mm})^{1/2}$')
         elif plot_no%ncols == 1 and i_type == 1:
-            plt.ylabel(r'$\xi_{\rm gm}/(\xi_{\rm gg} \xi_{\rm mm})^{1/2}$')
+            plt.ylabel(r'$\tilde r (r) = \xi_{\rm gm}/(\xi_{\rm gg} \xi_{\rm mm})^{1/2}$')
         else:
             plt.gca().axes.yaxis.set_ticklabels([])
 
-#plt.savefig("bias_corr_coeff.pdf")
+plt.savefig("bias_corr_coeff.pdf")
 plt.show()

@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 import h5py
 
+import plotparams
+plotparams.buba()
+
 # do the computation for the true galaxies?
 want_true = 0
 
@@ -27,6 +30,7 @@ gal_dir = "/home/boryanah/lars/LSSIllustrisTNG/Lensing/"
 test_name = '-'.join(opt.split('_'));print(test_name)
 pos_g = np.load(gal_dir+ext1+"/"+"true_gals.npy")
 pos_g_opt = np.load(gal_dir+ext2+"/"+proxy+"_"+opt+"_gals.npy")
+pos_m = np.load(gal_dir+"pos_parts_down_61035156.npy")
 
 # how mangy galaxies
 N_g = pos_g.shape[0]
@@ -45,7 +49,7 @@ def get_density(pos):
 
 D_g = get_density(pos_g)
 D_g_opt = get_density(pos_g_opt)
-
+D_m = get_density(pos_m)
 
 def Wg(k2, r):
     return np.exp(-k2*r*r/2.)
@@ -69,49 +73,59 @@ D_g_smo = gaussian_filter(D_g,R)
 #D_g_opt_smo = get_smooth_density(D_g_opt,rsmo=R)
 # fast
 D_g_opt_smo = gaussian_filter(D_g_opt,R)
+D_m_smo = gaussian_filter(D_m,1.)
 
 slice_id = 200#20
 Dens = D_g_smo[:,slice_id,:]
 Dopt = D_g_opt_smo[:,slice_id,:]
-Diff = Dens-Dopt
+Dens_m = D_m_smo[:,slice_id,:]
+Diff = Dopt-Dens
 Dpos = Diff.copy()
 Dpos[Diff<0.] = 0.
 Dneg = Diff.copy()
 Dneg[Diff>0.] = 0.
-Dneg = np.abs(Dneg)
 
-cm = 'gist_stern'#'prism'#'jet'#'gist_stern'#'jet'#'gist_stern'
-cm2 = 'terrain'#'Spectral'#'gist_rainbow'
+
+cm_front = 'gist_stern'
+cm_back = 'terrain'
 
 al = 0.4
-'''
-plt.subplots(1,3,figsize=(15,5))
-plt.subplot(1,3,1)
-plt.imshow(Dens,cmap=cm2)
-plt.imshow(Dpos,cmap=cm,alpha=al)
-plt.colorbar()
-plt.subplot(1,3,2)
-plt.imshow(Dens,cmap=cm2)
-plt.colorbar()
-plt.subplot(1,3,3)
-plt.imshow(Dens,cmap=cm2)
-plt.imshow(Dneg,cmap=cm,alpha=al)
-plt.colorbar()
-#plt.savefig("figs/cums_"+proxy+"_"+opt+".png")
-#plt.show()
+
+plt.imshow(np.log10(Dens_m+1),cmap='Greys')
+plt.imshow(Dpos,cmap=cm_front,alpha=al)#'coolwarm'
+#plt.colorbar()
+frame1 = plt.gca()
+frame1.axes.xaxis.set_ticklabels([])
+frame1.axes.yaxis.set_ticklabels([])
+plt.xlabel(r'$X \ [{\rm Mpc}/h]$')
+plt.ylabel(r'$Y \ [{\rm Mpc}/h]$')
+
+plt.savefig("cums_"+proxy+"_"+opt+".png")
+plt.show()
 plt.close()
-'''
+quit()
 nrows = 1
 ncols = 2
 plt.subplots(nrows,ncols,figsize=(15,5))
 plt.subplot(nrows,ncols,1)
-plt.imshow(Dens,cmap=cm2)
-#plt.imshow(Dpos,cmap=cm,alpha=al)
-#plt.colorbar()
+plt.imshow(Dens,cmap=cm_back)
+plt.imshow(Dpos,cmap=cm_front,alpha=al)
+frame1 = plt.gca()
+frame1.axes.xaxis.set_ticklabels([])
+frame1.axes.yaxis.set_ticklabels([])
+plt.xlabel(r'$X \ [{\rm Mpc}/h]$')
+plt.ylabel(r'$Y \ [{\rm Mpc}/h]$')
+
 plt.subplot(nrows,ncols,2)
-plt.imshow(Dens,cmap=cm2)
-plt.imshow(Dneg,cmap=cm,alpha=al)
+plt.imshow(np.log10(Dens_m+1),cmap='Greys')
+plt.imshow(Dpos,cmap=cm_front,alpha=al)#'coolwarm'
 #plt.colorbar()
+frame1 = plt.gca()
+frame1.axes.xaxis.set_ticklabels([])
+frame1.axes.yaxis.set_ticklabels([])
+plt.xlabel(r'$X \ [{\rm Mpc}/h]$')
+plt.ylabel(r'$Y \ [{\rm Mpc}/h]$')
+
 plt.savefig("cums_"+proxy+"_"+opt+".pdf")
-#plt.show()
+plt.show()
 plt.close()

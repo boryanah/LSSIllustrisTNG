@@ -29,7 +29,7 @@ else:
 binning = 'range'#'std' #'range'
 fix_1bin = True
 exclude_most_mass = 1
-N_exc_mm = 100#100#30#100
+N_exc_mm = 0#100#30#100
 show_fid = False#True
 if fix_1bin == True:
     skip = 500
@@ -434,8 +434,9 @@ env_avg_dm = np.load(root+'GroupEnvs_dm.npy')
 
 if opt == "env_cw" or opt == "env_avg":
     # Density in Illustris
-    filename = 'CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
-    f = h5py.File(filename, 'r')
+    fdir = '/mnt/store1/boryanah/IllustrisTNG/CosmicWeb'
+    filename = 'WEB_CIC_256_DM_TNG300-2.hdf5'
+    f = h5py.File(fdir+filename, 'r')
     d_smooth = f['density_smooth'][:,:,:] 
 
     # finding who belongs where in the cosmic web
@@ -783,8 +784,11 @@ while N_old < N_matched:
             i_opt_sss = (np.argsort(opt_sorted_sort))[bleh]
         else: i_opt_sss = np.argsort(opt_sorted_sort)[::-1]
 
+        # og
         dm_i = (dm_i_sort[i_opt_sss])[i_count_sort_rev]
         #print(dm_i)
+        # TESTING dasha's thing
+        #dm_i = (dm_i[np.argsort(gal_count)[::-1]])[np.argsort(np.argsort(opt_sorted)[::-1])]
     dmo_inds_halo_sorted[N_old:N_temp] = dm_i
     N_old = N_temp
 
@@ -1084,9 +1088,15 @@ if want_fp_pos:
     ext = 'pos'
 else:
     ext = 'peak'
-np.save("Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals.npy",xyz_shuff)
-np.save("Lensing/data_2dhod_"+ext+"/true_gals.npy",xyz_DM)
-#quit()
+
+if N_exc_mm == 0:
+    np.save("Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals_all.npy",xyz_shuff)
+    np.save("Lensing/data_2dhod_"+ext+"/true_gals_all.npy",xyz_DM)
+else:
+    np.save("Lensing/data_2dhod_"+ext+"/"+proxy+"_"+opt+"_gals.npy",xyz_shuff)
+    np.save("Lensing/data_2dhod_"+ext+"/true_gals.npy",xyz_DM)
+print("GET RID OF ME")
+quit()
 
 # REMOVE for new proxies
 bin_centers, a,b,c,d,xi_fid_shuff,xi_fid_shuff_err,rat_fid_shuff,rat_fid_shuff_err = np.loadtxt('/home/boryanah/lars/LSSIllustrisTNG/figs/paper/Corr_shuff_'+proxy+'.txt',unpack=True)

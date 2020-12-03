@@ -10,9 +10,9 @@ from utils import *
 
 # parameter choices
 proxy = 'vpeak'#'vrelax'
-want_matched = ''#'_matched'#'_matched'#'_matched'#'_matched'#''#'_matched'
+want_matched = ''#'_matched'
+want_total_pop = 1
 first_gal = 0
-N_gal = int(sys.argv[1])
 N_gal = 12000#60000#45000
 N_div = 2 # subpopulations
 sec_prop = sys.argv[2] # splitting by
@@ -105,6 +105,10 @@ chosen_inds_dm = (np.argsort(m_proxy)[::-1])[first_gal:N_gal]
 lum_proxy = SubhaloMassType_fp[:,4]
 # luminosity proxy sorting
 chosen_inds_fp = (np.argsort(lum_proxy)[::-1])[first_gal:N_gal]
+
+if want_total_pop:
+    pos_total_dm = SubhaloPos_dm[chosen_inds_dm]
+    pos_total_fp = SubhaloPos_fp[chosen_inds_fp]
 
 print("_____________________________________________________")
 print("mass of last object = ",lum_proxy[chosen_inds_fp[-1]])
@@ -207,11 +211,17 @@ bin_centers = (bins[:-1] + bins[1:])/2.
 
 N_dim = 3
 Rat_SHAM = np.zeros((N_bin-1,N_dim**3))
+Rat_DM = np.zeros((N_bin-1,N_dim**3))
+Rat_FP = np.zeros((N_bin-1,N_dim**3))
 for i_x in range(N_dim):
     for i_y in range(N_dim):
         for i_z in range(N_dim):
             xyz_FP_jack = xyz_FP.copy()
             xyz_DM_jack = xyz_DM.copy()
+
+            if want_total_pop:
+                pos_DM_jack = pos_total_dm.copy()
+                pos_FP_jack = pos_total_fp.copy()
             
             xyz = np.array([i_x,i_y,i_z],dtype=int)
             size = Lbox/N_dim
@@ -223,6 +233,15 @@ for i_x in range(N_dim):
             bool_arr = np.prod((xyz == (xyz_DM/size).astype(int)),axis=1).astype(bool)
             xyz_DM_jack[bool_arr] = np.array([0.,0.,0.])
             xyz_DM_jack = xyz_DM_jack[np.sum(xyz_DM_jack,axis=1)!=0.]
+
+            if want_total_pop:
+                bool_arr = np.prod((xyz == (pos_total_dm/size).astype(int)),axis=1).astype(bool)
+                pos_DM_jack[bool_arr] = np.array([0.,0.,0.])
+                pos_DM_jack = pos_DM_jack[np.sum(pos_DM_jack,axis=1)!=0.]
+                
+                bool_arr = np.prod((xyz == (pos_total_fp/size).astype(int)),axis=1).astype(bool)
+                pos_FP_jack[bool_arr] = np.array([0.,0.,0.])
+                pos_FP_jack = pos_FP_jack[np.sum(pos_FP_jack,axis=1)!=0.]
             
             x_DM_jack = xyz_DM_jack[:,0]
             y_DM_jack = xyz_DM_jack[:,1]
@@ -238,13 +257,25 @@ for i_x in range(N_dim):
             results_FP = Corrfunc.theory.xi(X=x_FP_jack,Y=y_FP_jack,Z=z_FP_jack,
                                             boxsize=Lbox, nthreads=16,
                                             binfile=bins)
-            
+
             Corr_FP = results_FP['xi']
             Corr_DM = results_DM['xi']
             Rat_SHAM[:,i_x+N_dim*i_y+N_dim**2*i_z] = Corr_DM/Corr_FP
 
+            if want_total_pop:
+                Corr_tot_FP = Corrfunc.theory.xi(X=pos_FP_jack[:,0],Y=pos_FP_jack[:,1],Z=pos_FP_jack[:,2],
+                                                boxsize=Lbox, nthreads=16, binfile=bins)['xi']
+                Corr_tot_DM = Corrfunc.theory.xi(X=pos_DM_jack[:,0],Y=pos_DM_jack[:,1],Z=pos_DM_jack[:,2],
+                                                boxsize=Lbox, nthreads=16, binfile=bins)['xi']
+                Rat_DM[:,i_x+N_dim*i_y+N_dim**2*i_z] = Corr_DM/Corr_tot_DM
+                Rat_FP[:,i_x+N_dim*i_y+N_dim**2*i_z] = Corr_FP/Corr_tot_FP
+
 Rat_SHAM_mean = np.mean(Rat_SHAM,axis=1)
 Rat_SHAM_err = np.sqrt(N_dim**3-1)*np.std(Rat_SHAM,axis=1)
+Rat_DM_mean = np.mean(Rat_DM,axis=1)
+Rat_DM_err = np.sqrt(N_dim**3-1)*np.std(Rat_DM,axis=1)
+Rat_FP_mean = np.mean(Rat_FP,axis=1)
+Rat_FP_err = np.sqrt(N_dim**3-1)*np.std(Rat_FP,axis=1)
 
 if N_div == 1:
     dm_ext = ''
@@ -257,6 +288,13 @@ if N_div >= 2:
     np.save("data_split/SHAM"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+"_error.npy",Rat_SHAM_err)
     np.save("data_split/bin_centers",bin_centers)
 
+    if want_total_pop:
+        np.save("data_split/DM"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+".npy",Rat_DM_mean)
+        np.save("data_split/DM"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+"_error.npy",Rat_DM_err)
+        np.save("data_split/FP"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+".npy",Rat_FP_mean)
+        np.save("data_split/FP"+want_matched+"_ratio_"+proxy+"_"+sec_prop+"_"+str(i_bin)+"_error.npy",Rat_FP_err)
+        
+    
 plt.figure(figsize=(12,8))
 plt.title("Auto-correlation ratio for "+str(n_gal)+" galaxies")
 plt.errorbar(bin_centers,Rat_SHAM_mean,yerr=Rat_SHAM_err,linewidth=2.,label='SHAM w/ '+proxy+' (DM)/ "true" (FP)')

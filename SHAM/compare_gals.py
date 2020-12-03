@@ -117,8 +117,9 @@ if want_formation:
     
     
 if want_environment:
-    filename = '/home/boryanah/lars/LSSIllustrisTNG/CosmicWeb/WEB_CIC_256_DM_TNG300-2.hdf5'
-    f = h5py.File(filename, 'r')
+    fdir = '/mnt/store1/boryanah/IllustrisTNG/CosmicWeb'
+    filename = 'WEB_CIC_256_DM_TNG300-2.hdf5'
+    f = h5py.File(fdir+filename, 'r')
     d_smooth = f['density_smooth'][:,:,:] 
 
     # finding who belongs where in the cosmic web

@@ -23,12 +23,17 @@ def get_RR_norm(bins,Lbox,N1=1,N2=1):
 n_thread = 16
 periodic = True
 dir_part = "/mnt/gosling1/boryanah/TNG300/"
-part_fn = "parts_position_tng300-3_99.npy"
+#part_fn = "parts_position_tng300-3_99.npy"
+part_fn = "pos_parts_tng300-2_99.npy"
+if 'tng300-2' in part_fn: N_m = 1250**3
+if 'tng300-3' in part_fn: N_m = 625**3
+
 proxy = "m200m"
 ext2 = "data_2dhod_peak" # place satellites on vpeaks
 ext1 = "data_2dhod_pos" # this is currentyl only used for the true gals positions
 opt = sys.argv[1]#"partial_fenv"#"partial_s2r"#"shuff"#"spin"#"shuff"#"conc"#"vani"#"shuff"#"env"#"partial_vani""partial_s2r""vdisp"
 
+want_full = 1 # include all halos and don't exclude top 100 as for rest of paper
 Lbox = 205. # in Mpc/h
 pcle_mass = 3.03e9 #M_solar/h
 # fiducial means are you looking at true galaxies or not
@@ -39,35 +44,57 @@ else:
     
 
 test_name = '-'.join(opt.split('_'));print(test_name)#proxy+"_"+opt
-pos_m = np.load(dir_part+part_fn)/1000. # in Mpc/h
 
 # load true gal pos and opt gal pos
-pos_g = np.load("../"+ext1+"/true_gals.npy").astype(np.float32)
-pos_g_opt = np.load("../"+ext2+"/"+proxy+"_"+opt+"_gals.npy").astype(np.float32)
+# og
+#pos_g = np.load("../"+ext1+"/true_gals.npy").astype(np.float32)
+#pos_g = np.load("../"+ext2+"/true_gals.npy").astype(np.float32)
+
+# TESTING with full
+pos_g = np.load("../"+ext2+"/true_gals_all.npy").astype(np.float32)
+
+# TESTING
+'''
+root = '/home/boryanah/lars/data_2500/'
+SubhaloPos_fp = np.load(root+'SubhaloPos_fp.npy')/1000.
+SubhaloMassType_fp = np.load(root+'SubhaloMassType_fp.npy')*1.e10
+lum_proxy = SubhaloMassType_fp[:,4]
+inds_top = (np.argsort(lum_proxy)[::-1])[869:11665]#pos_g.shape[0]]
+pos_g = SubhaloPos_fp[inds_top]
+'''
+if want_full:
+    pos_g_opt = np.load("../"+ext2+"/"+proxy+"_"+opt+"_gals_all.npy").astype(np.float32)
+else:
+    pos_g_opt = np.load("../"+ext2+"/"+proxy+"_"+opt+"_gals.npy").astype(np.float32)
 
 if fiducial == False:
     pos_g = pos_g_opt.copy()
 
-N_m = pos_m.shape[0]
-down = 5000
+down = 50000# for tng300-2 # 5000 for tng300-3
 N_m_down = N_m//down
-print("Number of pcles = ",N_m_down)
-print("Downsampling...")
+print("Number of pcles after downsampling = ",N_m_down)
 try:
     pos_m = np.load("../pos_m_down_"+str(down)+".npy")
     #pos_m = np.load("../pos_parts_down_610351.npy")
 except:
+    print("Downsampling...")
+    pos_m = np.load(dir_part+part_fn)/1000. # in Mpc/h
+
+    inds_m = np.arange(N_m)
+    np.random.shuffle(inds_m)
+    inds_m = inds_m[::down]
+    pos_m = pos_m[inds_m]
     #x_m = pos_m[::down,0]
     #y_m = pos_m[::down,1]
     #z_m = pos_m[::down,2]
     #pos_m = np.vstack((x_m,y_m,z_m)).T
 
-    pos_m = randomly_downsample_data(pos_m, N_m_down)
+    #pos_m = randomly_downsample_data(pos_m, N_m_down)
 
     print(pos_m.shape[0])
     np.save("../pos_m_down_"+str(down)+".npy",pos_m)
-    plt.scatter(pos_m[:,0],pos_m[:,1],s=0.01)
-    plt.show()
+    #plt.scatter(pos_m[:50000,0],pos_m[:50000,1],s=0.01)
+    #plt.show()
 print("Downsampled O.o!")
 
 down_fac = N_m/N_m_down
@@ -192,6 +219,8 @@ for i_x in range(N_dim):
             Y_jack_g = xyz_g_jack[:,1]
             Z_jack_g = xyz_g_jack[:,2]
 
+            N_g = len(X_jack_g)
+            N_m_down = len(X_jack_m)
             # Cross-correlation for gm
             print("Nightmare is starting")
             autocorr = 0
@@ -207,6 +236,8 @@ for i_x in range(N_dim):
             Corr_gm = DD_gm/RR_gm-1.
 
             # Corr_g
+            #Corr_g = Corrfunc.theory.xi(X=X_jack_g,Y=Y_jack_g,Z=Z_jack_g,boxsize=Lbox,nthreads=16,binfile=bins)['xi']
+            
             autocorr = 1
             results = DD(autocorr,nthreads=n_thread,binfile=bins,
                          X1=X_jack_g, Y1=Y_jack_g, Z1=Z_jack_g,
@@ -218,7 +249,10 @@ for i_x in range(N_dim):
             
             Corr_g = DD_gg/RR_gg-1.
             
+            
             # Corr_m
+            #Corr_m = Corrfunc.theory.xi(X=X_jack_m,Y=Y_jack_m,Z=Z_jack_m,boxsize=Lbox,nthreads=16,binfile=bins)['xi']
+            
             autocorr = 1
             results = DD(autocorr,nthreads=n_thread,binfile=bins,
                          X1=X_jack_m, Y1=Y_jack_m, Z1=Z_jack_m,
@@ -229,6 +263,7 @@ for i_x in range(N_dim):
             RR_mm = get_RR_norm(bins,Lbox)
             
             Corr_m = DD_mm/RR_mm-1.
+            
             
             bias[:,i_x+N_dim*i_y+N_dim**2*i_z] = np.sqrt(Corr_g/Corr_m)
             corr_coeff[:,i_x+N_dim*i_y+N_dim**2*i_z] = Corr_gm/np.sqrt(Corr_g*Corr_m) 

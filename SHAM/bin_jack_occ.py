@@ -48,7 +48,10 @@ SubhaloVmax_dm = np.load(root+'SubhaloVmax_'+dm_ext+'.npy')
 new_type = '_new'# newest is cut at vmax = 100; new at vmax = 50; null is old format/original
 SubhaloVpeak_dm = np.load(root+'SubhaloVpeak'+new_type+'_'+dm_ext+'.npy')
 SubhaloVpeak_dm[SubhaloVpeak_dm==0.] = SubhaloVmax_dm[SubhaloVpeak_dm==0.]
+# og
 SubhaloVinfall_dm = np.load(root+'SubhaloVinfall'+new_type+'_'+dm_ext+'.npy')
+# TESTING
+#SubhaloVinfall_dm = np.load(root+'SubhaloVpeakinfall'+new_type+'_'+dm_ext+'.npy')
 SubhaloVinfall_dm[SubhaloVinfall_dm==0.] = SubhaloVmax_dm[SubhaloVinfall_dm==0.]
 SubhaloVrelax_dm = np.load(root+'SubhaloVrelax'+new_type+'_'+dm_ext+'.npy')
 SubhaloPos_dm = np.load(root+'SubhaloPos_'+dm_ext+'.npy')/1000.
@@ -60,7 +63,10 @@ SubhaloMassType_dm = np.load(root+'SubhaloMassType_'+dm_ext+'.npy')
 SubhaloVelDisp_dm = np.load(root+'SubhaloVelDisp_'+dm_ext+'.npy')
 SubhaloMpeak_dm = np.load(root+'SubhaloMpeak'+new_type+'_'+dm_ext+'.npy')
 SubhaloMpeak_dm[SubhaloMpeak_dm==0.] = SubhaloMassType_dm[SubhaloMpeak_dm==0.,1]
+# og
 SubhaloMinfall_dm = np.load(root+'SubhaloMinfall'+new_type+'_'+dm_ext+'.npy')
+# TESTING
+#SubhaloMinfall_dm = np.load(root+'SubhaloMpeakinfall'+new_type+'_'+dm_ext+'.npy')
 SubhaloMinfall_dm[SubhaloMinfall_dm==0.] = SubhaloMassType_dm[SubhaloMinfall_dm==0.,1]
 
 # load the FP data
